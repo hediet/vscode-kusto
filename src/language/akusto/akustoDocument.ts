@@ -1,107 +1,168 @@
 import { OffsetRange } from '../common/offsetRange';
 import { KustoFragment } from './kustoFragment';
+import { parseDocument } from './documentParser';
+import { DocumentAst, Chapter, CodeBlock } from './ast';
 
 /**
- * Immutable Akusto document. Supports multiple fragments separated by empty lines,
- * and global variables via `let $name = ...` syntax.
+ * Immutable Akusto document. Parses instructions, chapters, and code blocks.
+ * Code blocks are further split into fragments separated by empty lines.
+ * Supports global and chapter-scoped definitions via `let $name = ...` syntax.
  */
 export class AkustoDocument {
-	private constructor(
-		public readonly uri: string,
-		public readonly text: string,
-		public readonly fragments: readonly KustoFragment[]
-	) {}
+    private constructor(
+        public readonly uri: string,
+        public readonly text: string,
+        public readonly ast: DocumentAst,
+        /** All fragments (top-level and in chapters). */
+        public readonly fragments: readonly KustoFragment[],
+        /** Top-level fragments only (globally visible definitions). */
+        public readonly topLevelFragments: readonly KustoFragment[],
+        /** Map from chapter to its fragments. */
+        public readonly chapterFragments: ReadonlyMap<Chapter, readonly KustoFragment[]>
+    ) { }
 
-	static parse(uri: string, text: string): AkustoDocument {
-		const fragments = AkustoDocument._parseFragments(text);
-		return new AkustoDocument(uri, text, fragments);
-	}
+    static parse(uri: string, text: string): AkustoDocument {
+        const ast = parseDocument(text);
+        const allFragments: KustoFragment[] = [];
+        const topLevelFragments: KustoFragment[] = [];
+        const chapterFragments = new Map<Chapter, KustoFragment[]>();
 
-	getFragmentAt(offset: number): KustoFragment | undefined {
-		return this.fragments.find(f => f.range.contains(offset));
-	}
+        // Parse top-level code blocks
+        for (const block of ast.getCodeBlocks()) {
+            const frags = AkustoDocument._parseCodeBlock(text, block);
+            allFragments.push(...frags);
+            topLevelFragments.push(...frags);
+        }
 
-	/** Fragments that export a name. */
-	getDefinitions(): Map<string, KustoFragment> {
-		const result = new Map<string, KustoFragment>();
-		for (const fragment of this.fragments) {
-			if (fragment.exportedName) {
-				result.set(fragment.exportedName, fragment);
-			}
-		}
-		return result;
-	}
+        // Parse chapter code blocks
+        for (const chapter of ast.getChapters()) {
+            const chapterFrags: KustoFragment[] = [];
+            for (const block of chapter.getCodeBlocks()) {
+                const frags = AkustoDocument._parseCodeBlock(text, block);
+                allFragments.push(...frags);
+                chapterFrags.push(...frags);
+            }
+            chapterFragments.set(chapter, chapterFrags);
+        }
 
-	private static _parseFragments(text: string): KustoFragment[] {
-		const fragments: KustoFragment[] = [];
-		const lines = text.split('\n');
-		
-		let fragmentStart = 0;
-		let fragmentLines: string[] = [];
-		let lineOffset = 0;
+        return new AkustoDocument(uri, text, ast, allFragments, topLevelFragments, chapterFragments);
+    }
 
-		const flushFragment = (endOffset: number) => {
-			if (fragmentLines.length > 0) {
-				const fragmentText = fragmentLines.join('\n');
-				// Trim leading/trailing empty lines for the actual content, but keep range
-				const trimmed = fragmentText.trim();
-				if (trimmed.length > 0) {
-					const range = new OffsetRange(fragmentStart, endOffset);
-					const exported = AkustoDocument._parseExportedName(trimmed);
-					const referenced = AkustoDocument._parseReferencedNames(trimmed, exported);
-					fragments.push(new KustoFragment(trimmed, range, exported, referenced));
-				}
-			}
-			fragmentLines = [];
-		};
+    getFragmentAt(offset: number): KustoFragment | undefined {
+        return this.fragments.find(f => f.range.contains(offset));
+    }
 
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
-			const lineEnd = lineOffset + line.length;
-			const isEmptyLine = line.trim() === '';
-			const isLastLine = i === lines.length - 1;
+    /** Get the chapter containing this offset, if any. */
+    getChapterAt(offset: number): Chapter | undefined {
+        return this.ast.findChapterAt(offset);
+    }
 
-			if (isEmptyLine && fragmentLines.length > 0) {
-				// End current fragment at end of previous line
-				flushFragment(lineOffset > 0 ? lineOffset - 1 : 0);
-				fragmentStart = lineEnd + (isLastLine ? 0 : 1); // +1 for newline
-			} else if (!isEmptyLine) {
-				if (fragmentLines.length === 0) {
-					fragmentStart = lineOffset;
-				}
-				fragmentLines.push(line);
-			}
+    /** Global definitions (top-level fragments that export a name). */
+    getDefinitions(): Map<string, KustoFragment> {
+        const result = new Map<string, KustoFragment>();
+        for (const fragment of this.topLevelFragments) {
+            if (fragment.exportedName) {
+                result.set(fragment.exportedName, fragment);
+            }
+        }
+        return result;
+    }
 
-			lineOffset = lineEnd + 1; // +1 for newline
-		}
+    /** Definitions visible from a given offset (global + chapter-local if in chapter). */
+    getVisibleDefinitions(offset: number): Map<string, KustoFragment> {
+        const result = this.getDefinitions();
+        const chapter = this.getChapterAt(offset);
+        if (chapter) {
+            const chapterFrags = this.chapterFragments.get(chapter) ?? [];
+            for (const fragment of chapterFrags) {
+                if (fragment.exportedName) {
+                    result.set(fragment.exportedName, fragment);
+                }
+            }
+        }
+        return result;
+    }
 
-		// Flush remaining fragment
-		if (fragmentLines.length > 0) {
-			flushFragment(text.length);
-		}
+    /** Get chapter-local definitions for a chapter. */
+    getChapterDefinitions(chapter: Chapter): Map<string, KustoFragment> {
+        const result = new Map<string, KustoFragment>();
+        const frags = this.chapterFragments.get(chapter) ?? [];
+        for (const fragment of frags) {
+            if (fragment.exportedName) {
+                result.set(fragment.exportedName, fragment);
+            }
+        }
+        return result;
+    }
 
-		return fragments;
-	}
+    /** Parse a CodeBlock into KustoFragments (split by empty lines). */
+    private static _parseCodeBlock(docText: string, block: CodeBlock): KustoFragment[] {
+        const fragments: KustoFragment[] = [];
+        const blockText = block.text;
+        const lines = blockText.split('\n');
 
-	// "let $events = ..." -> "$events"
-	private static _parseExportedName(text: string): string | null {
-		// Match: let $name = ...
-		const match = text.match(/^\s*let\s+(\$[a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
-		return match ? match[1] : null;
-	}
+        let fragmentStart = 0;
+        let fragmentLines: string[] = [];
+        let lineOffset = 0;
 
-	// Excludes the exported name if present.
-	private static _parseReferencedNames(text: string, excludeExported: string | null): string[] {
-		const refs = new Set<string>();
-		// Match all $identifier patterns
-		const regex = /\$[a-zA-Z_][a-zA-Z0-9_]*/g;
-		let match;
-		while ((match = regex.exec(text)) !== null) {
-			const name = match[0];
-			if (name !== excludeExported) {
-				refs.add(name);
-			}
-		}
-		return Array.from(refs);
-	}
+        const flushFragment = (endOffset: number) => {
+            if (fragmentLines.length > 0) {
+                const fragmentText = fragmentLines.join('\n');
+                const trimmed = fragmentText.trim();
+                if (trimmed.length > 0) {
+                    // Convert block-relative offsets to document offsets
+                    const docStart = block.range.start + fragmentStart;
+                    const docEnd = block.range.start + endOffset;
+                    const range = new OffsetRange(docStart, docEnd);
+                    const exported = AkustoDocument._parseExportedName(trimmed);
+                    const referenced = AkustoDocument._parseReferencedNames(trimmed, exported);
+                    fragments.push(new KustoFragment(trimmed, range, exported, referenced));
+                }
+            }
+            fragmentLines = [];
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const lineEnd = lineOffset + line.length;
+            const isEmptyLine = line.trim() === '';
+            const isLastLine = i === lines.length - 1;
+
+            if (isEmptyLine && fragmentLines.length > 0) {
+                flushFragment(lineOffset > 0 ? lineOffset - 1 : 0);
+                fragmentStart = lineEnd + (isLastLine ? 0 : 1);
+            } else if (!isEmptyLine) {
+                if (fragmentLines.length === 0) {
+                    fragmentStart = lineOffset;
+                }
+                fragmentLines.push(line);
+            }
+
+            lineOffset = lineEnd + 1;
+        }
+
+        if (fragmentLines.length > 0) {
+            flushFragment(blockText.length);
+        }
+
+        return fragments;
+    }
+
+    private static _parseExportedName(text: string): string | null {
+        const match = text.match(/^\s*let\s+(\$[a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
+        return match ? match[1] : null;
+    }
+
+    private static _parseReferencedNames(text: string, excludeExported: string | null): string[] {
+        const refs = new Set<string>();
+        const regex = /\$[a-zA-Z_][a-zA-Z0-9_]*/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const name = match[0];
+            if (name !== excludeExported) {
+                refs.add(name);
+            }
+        }
+        return Array.from(refs);
+    }
 }
