@@ -5,10 +5,9 @@
 :setDefaultDb("VSCode")
 
 
-let $event1 = RawEventsVSCode;
 
 let $events = RawEventsVSCode
-    | where EventName == "test";
+| where EventName == "test";
 
 
 # Query 123

@@ -48,6 +48,41 @@ export class AkustoDocument {
         return new AkustoDocument(uri, text, ast, allFragments, topLevelFragments, chapterFragments);
     }
 
+    /**
+     * Create a new document with an edit applied.
+     * Currently just reparses the full document; incremental parsing can be added later.
+     * 
+     * @param start Start offset of the edit range
+     * @param end End offset of the edit range (exclusive)
+     * @param newText Text to insert at the edit range
+     */
+    withEdit(start: number, end: number, newText: string): AkustoDocument {
+        // Apply the edit to get new text
+        const newFullText = this.text.substring(0, start) + newText + this.text.substring(end);
+        // For now, just reparse. Later we can implement incremental parsing.
+        return AkustoDocument.parse(this.uri, newFullText);
+    }
+
+    /**
+     * Apply multiple edits and return a new document.
+     * Edits should be sorted by offset (ascending) - they're applied from end to start
+     * to preserve offsets.
+     */
+    withEdits(edits: ReadonlyArray<{ start: number; end: number; text: string }>): AkustoDocument {
+        if (edits.length === 0) {
+            return this;
+        }
+
+        // Apply edits from end to start to preserve offsets
+        let newText = this.text;
+        const sortedEdits = [...edits].sort((a, b) => b.start - a.start);
+        for (const edit of sortedEdits) {
+            newText = newText.substring(0, edit.start) + edit.text + newText.substring(edit.end);
+        }
+
+        return AkustoDocument.parse(this.uri, newText);
+    }
+
     getFragmentAt(offset: number): KustoFragment | undefined {
         return this.fragments.find(f => f.range.contains(offset));
     }

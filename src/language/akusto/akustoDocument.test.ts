@@ -330,4 +330,74 @@ Logs`);
             expect(doc.getChapterAt(20)?.title).toBe('My Chapter');
         });
     });
+
+    describe('withEdit', () => {
+        it('applies simple text insertion', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'Events');
+            const edited = doc.withEdit(6, 6, ' | take 10');
+
+            expect(edited.text).toBe('Events | take 10');
+            expect(edited.fragments).toHaveLength(1);
+            expect(edited.fragments[0].text).toBe('Events | take 10');
+        });
+
+        it('applies text deletion', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'Events | take 10');
+            const edited = doc.withEdit(6, 16, '');
+
+            expect(edited.text).toBe('Events');
+        });
+
+        it('applies text replacement', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'let $x = 1');
+            const edited = doc.withEdit(9, 10, '42');
+
+            expect(edited.text).toBe('let $x = 42');
+        });
+
+        it('preserves URI', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'Events');
+            const edited = doc.withEdit(0, 6, 'Logs');
+
+            expect(edited.uri).toBe('file://test.kql');
+        });
+
+        it('reparses after edit', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'Events');
+            expect(doc.fragments[0].exportedName).toBeNull();
+
+            const edited = doc.withEdit(0, 6, 'let $events = Events');
+            expect(edited.fragments[0].exportedName).toBe('$events');
+        });
+    });
+
+    describe('withEdits', () => {
+        it('applies multiple edits', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'let $a = 1\nlet $b = 2');
+            const edited = doc.withEdits([
+                { start: 9, end: 10, text: '10' },
+                { start: 20, end: 21, text: '20' },
+            ]);
+
+            expect(edited.text).toBe('let $a = 10\nlet $b = 20');
+        });
+
+        it('handles unordered edits', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'AB');
+            // Provide edits in reverse order - should still work
+            const edited = doc.withEdits([
+                { start: 1, end: 2, text: 'X' },
+                { start: 0, end: 1, text: 'Y' },
+            ]);
+
+            expect(edited.text).toBe('YX');
+        });
+
+        it('returns same document for empty edits', () => {
+            const doc = AkustoDocument.parse('file://test.kql', 'Events');
+            const edited = doc.withEdits([]);
+
+            expect(edited).toBe(doc);
+        });
+    });
 });

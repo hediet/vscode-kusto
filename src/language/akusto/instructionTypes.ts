@@ -14,8 +14,17 @@ declare function setDefaultDb(database: string): void;
 /** Configure output settings. */
 declare function setOutput(config: OutputConfig): void;
 
+/**
+ * Connection configuration.
+ * - azureCli: Uses 'az login' credentials (recommended for local dev)
+ * - vscode: Uses VS Code's built-in authentication
+ * - defaultAzure: Tries multiple methods (env, managed identity, CLI, etc.)
+ * - connectionString: Raw connection string
+ */
 type ConnectionConfig = 
-	| { type: "azureIdentity"; cluster: string }
+	| { type: "azureCli"; cluster: string }
+	| { type: "vscode"; cluster: string }
+	| { type: "defaultAzure"; cluster: string }
 	| { type: "connectionString"; connectionString: string };
 
 interface OutputConfig {
@@ -26,9 +35,17 @@ interface OutputConfig {
 }
 `;
 
-/** Connection configuration types. */
+/**
+ * Connection configuration types.
+ * - azureCli: Uses 'az login' credentials (recommended for local dev)
+ * - vscode: Uses VS Code's built-in authentication
+ * - defaultAzure: Tries multiple methods (env, managed identity, CLI, etc.)
+ * - connectionString: Raw connection string
+ */
 export type ConnectionConfig =
-    | { type: 'azureIdentity'; cluster: string }
+    | { type: 'azureCli'; cluster: string }
+    | { type: 'vscode'; cluster: string }
+    | { type: 'defaultAzure'; cluster: string }
     | { type: 'connectionString'; connectionString: string };
 
 /** Output configuration. */

@@ -18,8 +18,6 @@ export class FragmentRef {
 
 /** Immutable project containing multiple Akusto documents. */
 export class AkustoProject {
-    private readonly _definitionCache: Map<string, FragmentRef> | null = null;
-
     private constructor(
         public readonly documents: ReadonlyMap<string, AkustoDocument>
     ) { }
@@ -80,16 +78,63 @@ export class AkustoProject {
         const deps = this._getTransitiveDependencies(targetDoc, targetFragment, chapter);
         const builder = new SourceMapBuilder();
 
+        // Build a map of $name -> name for variable renaming
+        const renames = new Map<string, string>();
         for (const dep of deps) {
-            builder.append(dep.fragment.text, new DocumentRange(dep.document.uri, dep.fragment.range));
-            builder.append(';\n');
+            if (dep.fragment.exportedName?.startsWith('$')) {
+                const kustoName = dep.fragment.exportedName.substring(1); // Strip $
+                renames.set(dep.fragment.exportedName, kustoName);
+            }
         }
 
-        builder.append(targetFragment.text, new DocumentRange(targetDoc.uri, targetFragment.range));
+        // Emit dependencies as let statements
+        for (const dep of deps) {
+            const exportedName = dep.fragment.exportedName;
+            if (exportedName) {
+                const kustoName = renames.get(exportedName) ?? exportedName;
+                // Emit: let name = <body>;
+                builder.append(`let ${kustoName} = `);
+                // Get the body text (after the "= " in the original)
+                const bodyText = this._getDefinitionBody(dep.fragment.text, exportedName);
+                const renamedBody = this._renameVariables(bodyText, renames);
+                builder.append(renamedBody, new DocumentRange(dep.document.uri, dep.fragment.range));
+                builder.append(';\n');
+            }
+        }
+
+        // Emit target fragment with variable renames
+        const renamedTarget = this._renameVariables(targetFragment.text, renames);
+        builder.append(renamedTarget, new DocumentRange(targetDoc.uri, targetFragment.range));
 
         const { text, sourceMap } = builder.build();
         const instructions = this._collectInstructions(targetDoc, chapter);
         return new ResolvedKustoDocument(text, sourceMap, instructions);
+    }
+
+    /** Extract body from a definition (strip "let $name = " or "$name = " prefix). */
+    private _getDefinitionBody(text: string, exportedName: string): string {
+        // Definition format: "let $name = <body>" or "$name = <body>"
+        const letPrefix = `let ${exportedName} = `;
+        if (text.startsWith(letPrefix)) {
+            return text.substring(letPrefix.length);
+        }
+        const simplePrefix = `${exportedName} = `;
+        if (text.startsWith(simplePrefix)) {
+            return text.substring(simplePrefix.length);
+        }
+        // Fallback: return as-is
+        return text;
+    }
+
+    /** Rename $variables to Kusto-compatible names. */
+    private _renameVariables(text: string, renames: Map<string, string>): string {
+        let result = text;
+        for (const [akustoName, kustoName] of renames) {
+            // Escape special regex characters in the name (especially $)
+            const escapedName = akustoName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            result = result.replace(new RegExp(`${escapedName}(?![a-zA-Z0-9_])`, 'g'), kustoName);
+        }
+        return result;
     }
 
     /** Collect resolved instructions for a fragment context. */

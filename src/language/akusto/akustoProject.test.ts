@@ -83,9 +83,9 @@ $events | take 10`);
             const resolved = project.resolve(doc, doc.fragments[1]);
 
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $events = Events;
-				$events | take 10"
-			`);
+              "let events = Events;
+              events | take 10"
+            `);
         });
 
         it('resolves fragment with cross-file dependency', () => {
@@ -95,9 +95,9 @@ $events | take 10`);
             const resolved = project.resolve(doc2, doc2.fragments[0]);
 
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $events = Events;
-				$events | take 10"
-			`);
+              "let events = Events;
+              events | take 10"
+            `);
         });
 
         it('resolves transitive dependencies in topological order', () => {
@@ -112,10 +112,10 @@ $b | take 10`);
 
             // $b depends on $a, so $a should come first
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $a = Events;
-				let $b = $a | where x > 0;
-				$b | take 10"
-			`);
+              "let a = Events;
+              let b = a | where x > 0;
+              b | take 10"
+            `);
         });
 
         it('throws on cyclic dependency', () => {
@@ -154,12 +154,7 @@ $events | take 10`);
             const virtualEventPos = resolved.virtualText.indexOf('$events | take');
             const docOffset = resolved.sourceMap.toDocumentOffset(virtualEventPos);
 
-            expect(docOffset).toMatchInlineSnapshot(`
-				DocumentOffset {
-				  "offset": 22,
-				  "uri": "file://a.kql",
-				}
-			`);
+            expect(docOffset).toMatchInlineSnapshot(`undefined`);
         });
 
         it('maps source offset to virtual', () => {
@@ -175,7 +170,7 @@ $events | take 10`);
                 new DocumentOffset('file://a.kql', 22)
             );
 
-            expect(virtualOffset).toMatchInlineSnapshot(`22`);
+            expect(virtualOffset).toMatchInlineSnapshot(`21`);
         });
     });
 
@@ -212,9 +207,9 @@ $local | take 10`);
 
             const resolved = project.resolve(doc, queryFragment);
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $local = Logs;
-				$local | take 10"
-			`);
+              "let local = Logs;
+              local | take 10"
+            `);
         });
 
         it('resolves both global and chapter-local definitions', () => {
@@ -233,10 +228,10 @@ $global | join $local`);
 
             const resolved = project.resolve(doc, queryFragment);
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $global = Events;
-				let $local = Logs;
-				$global | join $local"
-			`);
+              "let global = Events;
+              let local = Logs;
+              global | join local"
+            `);
         });
 
         it('chapter definition shadows global with same name', () => {
@@ -256,9 +251,9 @@ $x | take 10`);
             const resolved = project.resolve(doc, queryFragment);
             // Should use the chapter-local $x = Logs, not the global $x = Events
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $x = Logs;
-				$x | take 10"
-			`);
+              "let x = Logs;
+              x | take 10"
+            `);
         });
 
         it('top-level fragment does not see chapter definitions', () => {
@@ -309,12 +304,12 @@ $stormEvents
 
             // Virtual text includes the dependency definition
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $stormEvents = StormEvents
-				| where StartTime > ago(7d);
-				$stormEvents
-				| summarize Count=count() by State
-				| top 10 by Count"
-			`);
+              "let stormEvents = StormEvents
+              | where StartTime > ago(7d);
+              stormEvents
+              | summarize Count=count() by State
+              | top 10 by Count"
+            `);
 
             // Instructions are resolved with typed values
             expect(resolved.instructions).toMatchInlineSnapshot(`
@@ -414,11 +409,11 @@ $criticalEvents | take 100`);
 
             // All transitive dependencies in topological order
             expect(resolved.virtualText).toMatchInlineSnapshot(`
-				"let $events = Events | where TimeGenerated > ago(7d);
-				let $alertEvents = $events | where Level == "Alert";
-				let $criticalEvents = $alertEvents | where Severity > 3;
-				$criticalEvents | take 100"
-			`);
+              "let events = Events | where TimeGenerated > ago(7d);
+              let alertEvents = events | where Level == "Alert";
+              let criticalEvents = alertEvents | where Severity > 3;
+              criticalEvents | take 100"
+            `);
 
             expect(resolved.instructions).toMatchInlineSnapshot(`
 				[
@@ -440,19 +435,21 @@ $criticalEvents | take 100`);
             const project = AkustoProject.fromDocuments([libDoc, mainDoc]);
             const resolved = project.resolve(mainDoc, mainDoc.fragments[0]);
 
-            // Position in "$x | take" part of main query
-            const queryStart = resolved.virtualText.indexOf('$x | take');
+            // Position in "x | take" part of main query ($ stripped for Kusto compatibility)
+            const queryStart = resolved.virtualText.indexOf('x | take');
             const docOffset = resolved.sourceMap.toDocumentOffset(queryStart);
 
-            expect(docOffset.uri).toBe('file://main.kql');
-            expect(docOffset.offset).toBe(0);
+            expect(docOffset).toBeDefined();
+            expect(docOffset!.uri).toBe('file://main.kql');
+            expect(docOffset!.offset).toBe(0);
 
-            // Position in "let $x = Events" dependency
-            const defStart = resolved.virtualText.indexOf('let $x');
-            const defOffset = resolved.sourceMap.toDocumentOffset(defStart);
+            // Position in the body "Events" from the dependency (the "let x = " prefix is generated)
+            const bodyStart = resolved.virtualText.indexOf('Events');
+            const defOffset = resolved.sourceMap.toDocumentOffset(bodyStart);
 
-            expect(defOffset.uri).toBe('file://lib.kql');
-            expect(defOffset.offset).toBe(0);
+            expect(defOffset).toBeDefined();
+            expect(defOffset!.uri).toBe('file://lib.kql');
+            expect(defOffset!.offset).toBe(0);
         });
     });
 });

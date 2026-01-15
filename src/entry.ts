@@ -1,5 +1,6 @@
 
 import path = require("path");
+// @ts-ignore
 import hot = require("@hediet/node-reload/node");
 hot.enableHotReload({ entryModule: module, loggingFileRoot: path.join(__dirname, '..'), skipIfEnabled: true });
 

@@ -1,0 +1,161 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Kusto",
+    "scopeName": "source.kusto",
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#instructions"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#numbers"
+        },
+        {
+            "include": "#operators"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#functions"
+        },
+        {
+            "include": "#variables"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.kusto",
+                    "match": "//.*$"
+                }
+            ]
+        },
+        "instructions": {
+            "patterns": [
+                {
+                    "name": "meta.instruction.kusto",
+                    "match": "^\\s*(:)(\\w+)",
+                    "captures": {
+                        "1": {
+                            "name": "punctuation.definition.instruction.kusto"
+                        },
+                        "2": {
+                            "name": "entity.name.function.instruction.kusto"
+                        }
+                    }
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.kusto",
+                    "begin": "\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.kusto",
+                            "match": "\\\\."
+                        }
+                    ]
+                },
+                {
+                    "name": "string.quoted.single.kusto",
+                    "begin": "'",
+                    "end": "'",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.kusto",
+                            "match": "\\\\."
+                        }
+                    ]
+                },
+                {
+                    "name": "string.quoted.multi.kusto",
+                    "begin": "@\"",
+                    "end": "\""
+                },
+                {
+                    "name": "string.quoted.multi.kusto",
+                    "begin": "```",
+                    "end": "```"
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.kusto",
+                    "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b"
+                },
+                {
+                    "name": "constant.numeric.timespan.kusto",
+                    "match": "\\b\\d+[dhms]\\b"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.pipe.kusto",
+                    "match": "\\|"
+                },
+                {
+                    "name": "keyword.operator.comparison.kusto",
+                    "match": "==|!=|<>|<=|>=|<|>|=~|!~|in~|in|!in~|!in|has|!has|has_cs|hasprefix|hassuffix|contains|!contains|startswith|!startswith|endswith|!endswith|matches\\s+regex"
+                },
+                {
+                    "name": "keyword.operator.logical.kusto",
+                    "match": "\\b(and|or|not)\\b"
+                },
+                {
+                    "name": "keyword.operator.arithmetic.kusto",
+                    "match": "\\+|-|\\*|/|%"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.kusto",
+                    "match": "\\b(let|set|alias|declare|pattern|restrict|access|to)\\b"
+                },
+                {
+                    "name": "keyword.operator.tabular.kusto",
+                    "match": "\\b(where|project|extend|summarize|join|union|take|limit|top|sort|order|by|asc|desc|on|kind|leftouter|rightouter|innerunique|inner|fullouter|leftanti|rightanti|leftsemi|rightsemi|lookup|mv-expand|mv-apply|parse|parse-where|evaluate|render|as|with|datatable|print|count|distinct|sample|sample-distinct|getschema|facet|find|search|fork|serialize|range|invoke|external_data|materialize|toscalar)\\b"
+                },
+                {
+                    "name": "constant.language.kusto",
+                    "match": "\\b(true|false|null|datetime|timespan|dynamic|int|long|real|string|bool|guid|decimal)\\b"
+                },
+                {
+                    "name": "storage.type.kusto",
+                    "match": "\\b(database|cluster|table)\\b"
+                }
+            ]
+        },
+        "functions": {
+            "patterns": [
+                {
+                    "name": "entity.name.function.kusto",
+                    "match": "\\b(ago|now|startofday|startofweek|startofmonth|startofyear|endofday|endofweek|endofmonth|endofyear|datetime_add|datetime_diff|dayofweek|dayofmonth|dayofyear|weekofyear|monthofyear|hourofday|bin|floor|ceiling|round|abs|sign|log|log10|log2|exp|exp10|exp2|pow|sqrt|sum|avg|min|max|count|countif|dcount|dcountif|percentile|percentiles|stdev|variance|make_list|make_set|make_bag|arg_max|arg_min|any|take_any|strcat|strlen|substring|indexof|split|replace|trim|toupper|tolower|parse_json|parse_url|parse_urlquery|parse_path|parse_version|extract|extract_all|iif|iff|case|coalesce|isempty|isnotempty|isnull|isnotnull|tostring|toint|tolong|todouble|toreal|todatetime|totimespan|tobool|toguid|todecimal|hash|hash_sha256|base64_encode_tostring|base64_decode_tostring|url_encode|url_decode|zip|pack|pack_all|bag_keys|bag_remove_keys|array_length|array_concat|array_slice|set_difference|set_intersect|set_union|treepath|row_number|prev|next|ingestion_time|cursor_after|current_principal|current_principal_details|current_cluster_endpoint|extent_id|extent_tags)\\b"
+                }
+            ]
+        },
+        "variables": {
+            "patterns": [
+                {
+                    "name": "variable.other.kusto",
+                    "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+                }
+            ]
+        }
+    }
+}

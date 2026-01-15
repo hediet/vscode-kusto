@@ -19,25 +19,64 @@
 		"vscode": "^1.101.0"
 	},
 	"categories": [
-		"Debuggers"
+		"Programming Languages"
 	],
 	"activationEvents": [
-		"onLanguage:kusto",
-		"*"
+		"onLanguage:kusto"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/hediet/vscode-kusto"
 	},
-	"main": "./dist/entry.js",
-	"contributes": {},
+	"main": "./src/entry2.js",
+	"contributes": {
+		"languages": [
+			{
+				"id": "kusto",
+				"aliases": [
+					"Kusto",
+					"KQL"
+				],
+				"extensions": [
+					".kql",
+					".csl"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "kusto",
+				"scopeName": "source.kusto",
+				"path": "./syntaxes/kusto.tmLanguage.json"
+			}
+		],
+		"commands": [
+			{
+				"command": "kusto.runQuery",
+				"title": "Kusto: Run Query"
+			},
+			{
+				"command": "kusto.runQueryAtCursor",
+				"title": "Kusto: Run Query at Cursor"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "kusto.runQueryAtCursor",
+				"key": "ctrl+enter",
+				"mac": "cmd+enter",
+				"when": "editorTextFocus && editorLangId == kusto"
+			}
+		]
+	},
 	"scripts": {
 		"build": "npm run build-ts && npm run build-vsix",
 		"build-ts": "tsc -p ./",
 		"build-vsix": "vsce package --out extension.vsix",
 		"vscode:prepublish": "",
 		"dev": "tsc -watch -p ./",
-		"test": "vitest",
+		"test": "vitest --run",
 		"get-types": "dts dev"
 	},
 	"devDependencies": {
@@ -50,10 +89,14 @@
 		"vitest": "^4.0.17"
 	},
 	"dependencies": {
+		"@azure/identity": "^4.13.0",
+		"@azure/identity-vscode": "^2.1.0",
 		"@hediet/node-reload": "^0.10.0",
 		"@kusto/language-service-next": "^12.3.2",
 		"@vscode/observables": "file:../vscode-observables/observables",
+		"azure-kusto-data": "^7.0.4",
 		"devtools-protocol": "^0.0.1419081",
+		"tsx": "^4.21.0",
 		"ws": "^8.17.1"
 	},
 	"files": [
