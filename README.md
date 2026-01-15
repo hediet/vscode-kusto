@@ -1,33 +1,6 @@
-# JS Debug Value Editor (Experimental)
+# VS Code Kusto 2
 
-This extension allows to edit and view values of a debugee with a full text editor.
 
-Currently only supports javascript debug adaptors.
-
-## Usage
-
-* Put a property access expression like this into the source code:
-```ts
-globalThis.playground.inputOptions; // editable
-```
-
-* By doing that, a code lens appears:
-
-![Demo](./docs/demo_code-lens.png)
-
-* Start a JS debug session
-* Click on the code lens to view and edit the runtime value of the property. This can be done while the debug session is paused or running. When the debug session is running, the expression must be evaluatable in the global context.
-* If the property returns an object that contains a `$fileExtension` property, the opened document will consider that file extension:
-```
-class MyPlayground {
-    inputOptions = {
-        $fileExtension: 'txt',
-        value: {
-            foo: 'bar'
-        }
-    };
-}
-```
 
 
 ## Contributing

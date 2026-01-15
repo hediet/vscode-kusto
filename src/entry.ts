@@ -1,7 +1,7 @@
 
-// import path = require("path");
-// import hot = require("@hediet/node-reload/node");
-// hot.enableHotReload({ entryModule: module, loggingFileRoot: path.join(__dirname, '..'), skipIfEnabled: true });
+import path = require("path");
+import hot = require("@hediet/node-reload/node");
+hot.enableHotReload({ entryModule: module, loggingFileRoot: path.join(__dirname, '..'), skipIfEnabled: true });
 
 import { ExtensionContext } from "vscode";
 import { hotReloadExportedItem } from "@hediet/node-reload";

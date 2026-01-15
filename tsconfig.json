@@ -12,5 +12,5 @@
 		"useDefineForClassFields": false,
 		"skipLibCheck": true
 	},
-	"include": ["./src/**/*", "./vscode.proposed.debugVisualization.d.ts"]
+	"include": ["./src/**/*"]
 }

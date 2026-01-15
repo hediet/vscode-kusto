@@ -1,0 +1,24 @@
+// must be in this order:
+
+// :meta.include("./defs.kql")
+
+// :meta.setConnection({ type: "azureIdentity", cluster: "https://ddtelvscode.kusto.windows.net/" })
+// :meta.setDefaultDb("VSCode")
+
+
+// for later:
+// :meta.setOutput({ webEditorUrl: "https://test-viewer.de" })
+// :meta.setOutput({ fileExt: ".test.json" })
+
+
+
+
+
+let $event1 = RawEventsVSCode;
+
+let $events = RawEventsVSCode
+    | where EventName == "test";
+
+$events
+| where Properties["mode"] == "longterm" "5minWindow"
+
