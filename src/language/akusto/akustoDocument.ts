@@ -83,8 +83,12 @@ export class AkustoDocument {
         return AkustoDocument.parse(this.uri, newText);
     }
 
+    /**
+     * Get the fragment containing this offset.
+     * Uses inclusive end to handle cursor at end of fragment.
+     */
     getFragmentAt(offset: number): KustoFragment | undefined {
-        return this.fragments.find(f => f.range.contains(offset));
+        return this.fragments.find(f => f.range.start <= offset && offset <= f.range.endExclusive);
     }
 
     /** Get the chapter containing this offset, if any. */
@@ -143,15 +147,17 @@ export class AkustoDocument {
         const flushFragment = (endOffset: number) => {
             if (fragmentLines.length > 0) {
                 const fragmentText = fragmentLines.join('\n');
-                const trimmed = fragmentText.trim();
-                if (trimmed.length > 0) {
+                // Check if there's any non-whitespace content
+                if (fragmentText.trim().length > 0) {
                     // Convert block-relative offsets to document offsets
+                    // Keep the original text (with trailing whitespace) so cursor positions work
                     const docStart = block.range.start + fragmentStart;
                     const docEnd = block.range.start + endOffset;
                     const range = new OffsetRange(docStart, docEnd);
-                    const exported = AkustoDocument._parseExportedName(trimmed);
-                    const referenced = AkustoDocument._parseReferencedNames(trimmed, exported);
-                    fragments.push(new KustoFragment(trimmed, range, exported, referenced));
+
+                    const exported = AkustoDocument._parseExportedName(fragmentText);
+                    const referenced = AkustoDocument._parseReferencedNames(fragmentText, exported);
+                    fragments.push(new KustoFragment(fragmentText, range, exported, referenced));
                 }
             }
             fragmentLines = [];
@@ -184,13 +190,56 @@ export class AkustoDocument {
     }
 
     private static _parseExportedName(text: string): string | null {
-        const match = text.match(/^\s*let\s+(\$[a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
+        // Strip leading comments before looking for let statement
+        const strippedText = AkustoDocument._stripLeadingComments(text);
+        const match = strippedText.match(/^\s*let\s+(\$[a-zA-Z_][a-zA-Z0-9_.]*)\s*=/);
         return match ? match[1] : null;
+    }
+
+    /**
+     * Strip leading single-line and multi-line comments from text.
+     * Handles // comments and block comments.
+     */
+    private static _stripLeadingComments(text: string): string {
+        let result = text;
+        let changed = true;
+
+        while (changed) {
+            changed = false;
+            // Strip leading whitespace
+            result = result.replace(/^\s+/, '');
+
+            // Strip single-line comment
+            if (result.startsWith('//')) {
+                const newlineIdx = result.indexOf('\n');
+                if (newlineIdx >= 0) {
+                    result = result.substring(newlineIdx + 1);
+                    changed = true;
+                } else {
+                    // Entire text is a comment
+                    return '';
+                }
+            }
+
+            // Strip multi-line comment
+            if (result.startsWith('/*')) {
+                const endIdx = result.indexOf('*/');
+                if (endIdx >= 0) {
+                    result = result.substring(endIdx + 2);
+                    changed = true;
+                } else {
+                    // Unclosed comment - return what we have
+                    return result;
+                }
+            }
+        }
+
+        return result;
     }
 
     private static _parseReferencedNames(text: string, excludeExported: string | null): string[] {
         const refs = new Set<string>();
-        const regex = /\$[a-zA-Z_][a-zA-Z0-9_]*/g;
+        const regex = /\$[a-zA-Z_][a-zA-Z0-9_.]*/g;
         let match;
         while ((match = regex.exec(text)) !== null) {
             const name = match[0];

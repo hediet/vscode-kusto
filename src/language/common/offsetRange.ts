@@ -32,6 +32,14 @@ export class OffsetRange {
 		return this.start <= offset && offset < this.endExclusive;
 	}
 
+	/**
+	 * Check if offset is contained or touches the end.
+	 * Useful for cursor positions where being at endExclusive should count.
+	 */
+	containsOrTouches(offset: number): boolean {
+		return this.start <= offset && offset <= this.endExclusive;
+	}
+
 	containsRange(other: OffsetRange): boolean {
 		return this.start <= other.start && other.endExclusive <= this.endExclusive;
 	}

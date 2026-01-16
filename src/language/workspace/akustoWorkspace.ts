@@ -1,5 +1,5 @@
 import { FileSystem, FileContent } from '../common/fileSystem';
-import { AkustoDocument, AkustoProject, AkustoProjectLoader, ResolvedDocumentAdapter } from '../akusto';
+import { AkustoDocument, AkustoProject, AkustoProjectLoader, ResolvedDocumentAdapter, SourceTextProvider } from '../akusto';
 import { createKustoLanguageService, KustoLanguageService, KustoSchema } from '../kusto';
 import { KustoFragment } from '../akusto/kustoFragment';
 
@@ -131,7 +131,14 @@ export class AkustoWorkspace {
 
         try {
             const resolved = this._project.resolve(doc, fragment);
-            return new ResolvedDocumentAdapter(resolved, this._languageService);
+            // Create a source text provider that looks up documents from the project
+            const sourceTextProvider: SourceTextProvider = {
+                getSourceText: (sourceUri: string) => {
+                    const sourceDoc = this._project.documents.get(sourceUri);
+                    return sourceDoc?.text;
+                }
+            };
+            return new ResolvedDocumentAdapter(resolved, this._languageService, sourceTextProvider);
         } catch {
             return null;
         }

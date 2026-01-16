@@ -1,8 +1,9 @@
-import { Client, KustoConnectionStringBuilder } from 'azure-kusto-data';
+import { Client, KustoConnectionStringBuilder, ClientRequestProperties } from 'azure-kusto-data';
 import * as vscode from 'vscode';
 import { KustoSchema, TableSchema, ColumnSchema } from '../language/kusto/kustoLanguageService';
 import { AccessToken, TokenCredential, AzureCliCredential, DefaultAzureCredential } from '@azure/identity';
 import { ConnectionConfig } from '../language/akusto/instructionTypes';
+import { randomUUID } from 'crypto';
 
 /** Auth type for creating clients */
 export type AuthType = ConnectionConfig['type'];
@@ -45,6 +46,32 @@ function createCredential(authType: AuthType): TokenCredential {
 }
 
 /**
+ * Kusto visualization properties from render operator.
+ */
+export interface KustoVisualization {
+    /** Visualization type (table, linechart, barchart, etc.) */
+    type: string;
+    /** X-axis column */
+    xColumn?: string;
+    /** Y-axis columns */
+    yColumns?: string[];
+    /** Series column (for grouping) */
+    series?: string;
+    /** Chart title */
+    title?: string;
+    /** X-axis title */
+    xTitle?: string;
+    /** Y-axis title */
+    yTitle?: string;
+    /** Legend visibility */
+    legend?: string;
+    /** Y-axis scale (linear, log) */
+    yScale?: string;
+    /** Additional properties */
+    [key: string]: unknown;
+}
+
+/**
  * Query result from Kusto.
  */
 export interface QueryResult {
@@ -54,6 +81,8 @@ export interface QueryResult {
     rows: unknown[][];
     /** Total row count (may be more than returned rows if truncated) */
     totalRows: number;
+    /** Visualization properties from render operator */
+    visualization?: KustoVisualization;
 }
 
 /**
@@ -67,26 +96,116 @@ export class KustoClient {
 
     /**
      * Execute a query against a Kusto cluster.
+     * @param signal - Optional AbortSignal to cancel the query. When aborted, a cancel command is sent to the server.
      */
-    async executeQuery(cluster: string, database: string, query: string, authType: AuthType = 'azureCli'): Promise<QueryResult> {
+    async executeQuery(cluster: string, database: string, query: string, authType: AuthType = 'azureCli', signal?: AbortSignal): Promise<QueryResult> {
         const client = await this._getClient(cluster, authType);
-        const response = await client.execute(database, query);
 
-        const primaryResults = response.primaryResults[0];
-        if (!primaryResults || primaryResults._rows.length === 0) {
-            return { columns: [], rows: [], totalRows: 0 };
+        // Create request properties with a custom clientRequestId for cancellation support
+        const properties = new ClientRequestProperties();
+        const clientRequestId = `vscode-kusto;${randomUUID()}`;
+        properties.clientRequestId = clientRequestId;
+
+        // Set up cancellation handler
+        let abortHandler: (() => void) | undefined;
+        if (signal) {
+            abortHandler = () => {
+                // Send cancel command to server asynchronously
+                this._cancelQuery(cluster, database, clientRequestId, authType).catch(err => {
+                    console.warn('Failed to cancel query:', err);
+                });
+            };
+            signal.addEventListener('abort', abortHandler, { once: true });
         }
 
-        const columns = primaryResults.columns.map(c => c.name ?? '');
-        const rows = primaryResults._rows.map(row =>
-            columns.map((_, i) => row[i])
-        );
+        try {
+            const response = await client.execute(database, query, properties);
 
-        return {
-            columns,
-            rows,
-            totalRows: rows.length,
-        };
+            const primaryResults = response.primaryResults[0];
+            if (!primaryResults || primaryResults._rows.length === 0) {
+                return { columns: [], rows: [], totalRows: 0 };
+            }
+
+            const columns = primaryResults.columns.map(c => c.name ?? '');
+            const rows = primaryResults._rows.map(row =>
+                columns.map((_, i) => row[i])
+            );
+
+            // Extract visualization properties from @ExtendedProperties table
+            const visualization = this._extractVisualization(response);
+
+            return {
+                columns,
+                rows,
+                totalRows: rows.length,
+                visualization,
+            };
+        } finally {
+            // Clean up abort handler
+            if (signal && abortHandler) {
+                signal.removeEventListener('abort', abortHandler);
+            }
+        }
+    }
+
+    /**
+     * Cancel a running query on the server.
+     */
+    private async _cancelQuery(cluster: string, database: string, clientRequestId: string, authType: AuthType): Promise<void> {
+        try {
+            const client = await this._getClient(cluster, authType);
+            // Use the management command to cancel the query
+            await client.execute(database, `.cancel query '${clientRequestId}'`);
+        } catch (err) {
+            // Log but don't throw - cancellation is best-effort
+            console.warn(`Failed to cancel query ${clientRequestId}:`, err);
+        }
+    }
+
+    /**
+     * Extract visualization properties from Kusto response.
+     * Kusto stores render hints in the @ExtendedProperties secondary result.
+     */
+    private _extractVisualization(response: { primaryResults: unknown[]; tables?: unknown[] }): KustoVisualization | undefined {
+        // Look for visualization info in tables (secondary results)
+        const tables = (response as { tables?: Array<{ name?: string; _rows?: unknown[][] }> }).tables;
+        if (!tables) return undefined;
+
+        for (const table of tables) {
+            // Find the @ExtendedProperties table which contains visualization info
+            const tableName = (table as { name?: string }).name;
+            if (tableName === '@ExtendedProperties') {
+                const rows = (table as { _rows?: unknown[][] })._rows;
+                if (rows) {
+                    for (const row of rows) {
+                        // Row structure: [propertyId, key, value]
+                        const key = row[1] as string;
+                        if (key === 'Visualization') {
+                            const value = row[2] as string;
+                            try {
+                                const vizProps = JSON.parse(value);
+                                return {
+                                    type: vizProps.Visualization ?? 'table',
+                                    xColumn: vizProps.XColumn,
+                                    yColumns: vizProps.YColumns?.split(',').map((s: string) => s.trim()),
+                                    series: vizProps.Series,
+                                    title: vizProps.Title,
+                                    xTitle: vizProps.XTitle,
+                                    yTitle: vizProps.YTitle,
+                                    legend: vizProps.Legend,
+                                    yScale: vizProps.YScale,
+                                };
+                            } catch {
+                                // If parsing fails, try to use value as visualization type
+                                return { type: value || 'table' };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return undefined;
     }
 
     /**

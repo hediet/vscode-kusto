@@ -132,6 +132,33 @@ describe('SourceMap', () => {
 			// file://a.kql is mapped from [10, 30), so offset 5 is outside
 			expect(map.fromDocumentOffset(new DocumentOffset('file://a.kql', 5))).toMatchInlineSnapshot(`undefined`);
 		});
+
+		it('maps offset at start of segment (inclusive)', () => {
+			// file://a.kql sourceRange starts at 10
+			expect(map.fromDocumentOffset(new DocumentOffset('file://a.kql', 10))).toMatchInlineSnapshot(`0`);
+		});
+
+		it('returns undefined for offset at end of segment by default', () => {
+			// file://a.kql sourceRange ends at 30 (exclusive)
+			// By default, endExclusive is not included
+			expect(map.fromDocumentOffset(new DocumentOffset('file://a.kql', 30))).toMatchInlineSnapshot(`undefined`);
+		});
+
+		it('maps offset at end of segment with includeTouchingEnd=true', () => {
+			// file://a.kql sourceRange ends at 30 (exclusive), but with includeTouchingEnd we include it
+			// This handles completions at end of line/document
+			expect(map.fromDocumentOffset(new DocumentOffset('file://a.kql', 30), true)).toMatchInlineSnapshot(`20`);
+		});
+
+		it('returns undefined for offset past end of segment', () => {
+			// file://a.kql is mapped from [10, 30), offset 31 is past the end
+			expect(map.fromDocumentOffset(new DocumentOffset('file://a.kql', 31))).toMatchInlineSnapshot(`undefined`);
+		});
+
+		it('returns undefined for offset past end even with includeTouchingEnd', () => {
+			// offset 31 is past the end, even with includeTouchingEnd
+			expect(map.fromDocumentOffset(new DocumentOffset('file://a.kql', 31), true)).toMatchInlineSnapshot(`undefined`);
+		});
 	});
 
 	describe('bidirectional mapping consistency', () => {

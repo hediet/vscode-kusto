@@ -7,6 +7,7 @@ export interface CompletionItem {
     readonly label: string;
     readonly kind: CompletionKind;
     readonly detail?: string;
+    readonly documentation?: string;
     readonly insertText?: string;
     readonly filterText?: string;
 }
@@ -58,6 +59,22 @@ export interface Hover {
     readonly range?: OffsetRange;
 }
 
+/** Kind of related element. */
+export type RelatedElementKind = 'syntax' | 'reference' | 'declaration' | 'other';
+
+/** A related element (e.g., declaration or reference of a symbol). */
+export interface RelatedElement {
+    readonly start: number;
+    readonly length: number;
+    readonly kind: RelatedElementKind;
+}
+
+/** Information about related elements at a position. */
+export interface RelatedInfo {
+    readonly elements: readonly RelatedElement[];
+    readonly currentIndex: number;
+}
+
 /** Kusto schema for a database. */
 export interface KustoSchema {
     readonly cluster: string;
@@ -91,12 +108,29 @@ export interface KustoLanguageService {
 
     /** Get hover information at the given offset. */
     getHover(text: string, offset: number): Hover | null;
+
+    /** Get related elements (declarations, references) at the given offset. */
+    getRelatedElements(text: string, offset: number): RelatedInfo | null;
 }
 
 /** Create a Kusto language service, optionally with schema. */
 export function createKustoLanguageService(schema?: KustoSchema): KustoLanguageService {
     const globalState = schema ? createGlobalState(schema) : Kusto.Language.GlobalState.Default!;
-    return new KustoLanguageServiceImpl(globalState);
+
+    // Build column docstring lookup map from schema
+    const columnDocstrings = new Map<string, string>();
+    if (schema) {
+        for (const table of schema.tables) {
+            for (const col of table.columns) {
+                if (col.docstring) {
+                    // Store with just column name (columns are unique within context)
+                    columnDocstrings.set(col.name, col.docstring);
+                }
+            }
+        }
+    }
+
+    return new KustoLanguageServiceImpl(globalState, columnDocstrings);
 }
 
 /** Create GlobalState from our schema definition. */
@@ -132,7 +166,10 @@ function createGlobalState(schema: KustoSchema): Kusto.Language.GlobalState {
 
 /** Implementation of KustoLanguageService. */
 class KustoLanguageServiceImpl implements KustoLanguageService {
-    constructor(private readonly globalState: Kusto.Language.GlobalState) { }
+    constructor(
+        private readonly globalState: Kusto.Language.GlobalState,
+        private readonly columnDocstrings: Map<string, string> = new Map()
+    ) { }
 
     getCompletions(text: string, offset: number): CompletionItem[] {
         const codeService = new Kusto.Language.Editor.KustoCodeService.$ctor1(text, this.globalState);
@@ -149,10 +186,19 @@ class KustoLanguageServiceImpl implements KustoLanguageService {
         for (let i = 0; i < count; i++) {
             const item = items.getItem(i);
             if (item?.DisplayText) {
+                const kind = mapCompletionKind(item.Kind);
+
+                // Look up documentation for columns
+                let documentation: string | undefined;
+                if (kind === 'column') {
+                    documentation = this.columnDocstrings.get(item.DisplayText);
+                }
+
                 result.push({
                     label: item.DisplayText,
-                    kind: mapCompletionKind(item.Kind),
+                    kind,
                     detail: getKindDisplayName(item.Kind),
+                    documentation,
                     insertText: item.AfterText ? item.DisplayText + item.AfterText : undefined,
                     filterText: item.MatchText ?? undefined,
                 });
@@ -221,6 +267,30 @@ class KustoLanguageServiceImpl implements KustoLanguageService {
 
         return {
             contents: quickInfo.Text,
+        };
+    }
+
+    getRelatedElements(text: string, offset: number): RelatedInfo | null {
+        const codeService = new Kusto.Language.Editor.KustoCodeService.$ctor1(text, this.globalState);
+        const relatedInfo = codeService.GetRelatedElements(offset);
+
+        if (!relatedInfo) {
+            return null;
+        }
+
+        const elements: RelatedElement[] = [];
+        for (let i = 0; i < relatedInfo.Elements.Count; i++) {
+            const el = relatedInfo.Elements.getItem(i);
+            elements.push({
+                start: el.Start,
+                length: el.Length,
+                kind: mapRelatedElementKind(el.Kind),
+            });
+        }
+
+        return {
+            elements,
+            currentIndex: relatedInfo.CurrentIndex,
         };
     }
 }
@@ -329,5 +399,17 @@ function mapClassificationKind(kind: Kusto.Language.Editor.ClassificationKind): 
         case K.Column: return 'column';
         case K.Parameter: return 'parameter';
         default: return null;
+    }
+}
+
+/** Map Kusto RelatedElementKind to our kind. */
+function mapRelatedElementKind(kind: number): RelatedElementKind {
+    // Kusto.Language.Editor.RelatedElementKind: Syntax=0, Reference=1, Declaration=2, Other=3
+    switch (kind) {
+        case 0: return 'syntax';
+        case 1: return 'reference';
+        case 2: return 'declaration';
+        case 3: return 'other';
+        default: return 'other';
     }
 }

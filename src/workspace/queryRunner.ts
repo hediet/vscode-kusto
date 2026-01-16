@@ -3,14 +3,21 @@ import { MutableProject } from '../language/workspace/mutableProject';
 import { Disposable } from '../utils/disposables';
 import { AkustoDocument } from '../language/akusto/akustoDocument';
 import { KustoFragment } from '../language/akusto/kustoFragment';
-import { getKustoClient, QueryResult, AuthType } from '../connection';
+import { AuthType } from '../connection';
 import { ResolvedKustoDocument } from '../language/akusto/resolvedKustoDocument';
 import { extractConnection } from './languageServiceResolver';
+import { ResultsViewProvider } from './resultsViewProvider';
+import { QueryHistoryModel, getQueryService } from './queryHistoryModel';
 
 /**
  * Handles running Kusto queries and displaying results.
+ * 
+ * Uses QueryService to execute queries and QueryHistoryModel to track them.
  */
 export class QueryRunner extends Disposable {
+    private _resultsProvider: ResultsViewProvider | undefined;
+    private _historyModel: QueryHistoryModel | undefined;
+
     constructor(private readonly model: MutableProject) {
         super();
 
@@ -23,15 +30,20 @@ export class QueryRunner extends Disposable {
         this._register(
             vscode.commands.registerCommand('kusto.runQueryAtCursor', this._runQueryAtCursor.bind(this))
         );
+    }
 
-        // Register virtual document provider for results
-        this._register(
-            vscode.workspace.registerTextDocumentContentProvider('kusto-result', {
-                provideTextDocumentContent: (uri) => {
-                    return uri.query || '# No results yet';
-                }
-            })
-        );
+    /**
+     * Set the results view provider for displaying results in webview
+     */
+    public setResultsProvider(provider: ResultsViewProvider) {
+        this._resultsProvider = provider;
+    }
+
+    /**
+     * Set the history model for tracking query executions
+     */
+    public setHistoryModel(model: QueryHistoryModel) {
+        this._historyModel = model;
     }
 
     private async _runQueryAtCursor(): Promise<void> {
@@ -87,7 +99,7 @@ export class QueryRunner extends Disposable {
 
             if (cluster && database) {
                 // Execute the query
-                await this._executeAndShowResult(fragment.text, resolved.virtualText, cluster, database, authType);
+                this._executeQuery(fragment.text, resolved.virtualText, cluster, database, authType);
             } else {
                 // Show resolved query without execution
                 await this._showResolvedOnly(fragment.text, resolved);
@@ -97,181 +109,53 @@ export class QueryRunner extends Disposable {
         }
     }
 
-    private async _executeAndShowResult(
+    private _executeQuery(
         originalQuery: string,
         resolvedQuery: string,
         cluster: string,
         database: string,
         authType: AuthType
-    ): Promise<void> {
-        const client = getKustoClient();
-        const timestamp = new Date().toLocaleTimeString();
+    ): void {
+        // Reveal the results panel
+        vscode.commands.executeCommand('kusto.resultsView.focus');
+        this._resultsProvider?.reveal();
 
-        let resultContent: string;
-        try {
-            // Show progress
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: 'Executing Kusto query...',
-                cancellable: false,
-            }, async () => {
-                const result = await client.executeQuery(cluster, database, resolvedQuery, authType);
-                resultContent = this._formatResult(originalQuery, resolvedQuery, result, timestamp, cluster, database);
-            });
-        } catch (e) {
-            resultContent = this._formatError(originalQuery, resolvedQuery, e, timestamp, cluster, database);
-        }
+        // Execute via QueryService
+        const queryService = getQueryService();
+        const execution = queryService.execute(cluster, database, originalQuery, resolvedQuery, authType);
 
-        await this._showResultDocument(resultContent!);
+        // Add to history
+        this._historyModel?.addExecution(execution);
     }
 
     private async _showResolvedOnly(originalQuery: string, resolved: ResolvedKustoDocument): Promise<void> {
-        const timestamp = new Date().toLocaleTimeString();
-
-        const content = [
-            '# Kusto Query',
-            '',
-            `*Generated at ${timestamp}*`,
-            '',
-            '## Original Query',
-            '```kusto',
-            originalQuery,
-            '```',
-            '',
-            '## Resolved Query (with definitions)',
-            '```kusto',
-            resolved.virtualText,
-            '```',
-            '',
-            '---',
-            '',
-            '> **No connection configured.** Add a connection to execute queries:',
-            '> ```',
-            '> :setConnection({ type: "azureCli", cluster: "help.kusto.windows.net" })',
-            '> :setDefaultDb("Samples")',
-            '> ```',
-        ].join('\n');
-
-        await this._showResultDocument(content);
-    }
-
-    private _formatResult(
-        originalQuery: string,
-        resolvedQuery: string,
-        result: QueryResult,
-        timestamp: string,
-        cluster: string,
-        database: string
-    ): string {
-        const lines = [
-            '# Kusto Query Result',
-            '',
-            `*Executed at ${timestamp}*`,
-            '',
-            `**Cluster:** \`${cluster}\`  `,
-            `**Database:** \`${database}\``,
-            '',
-            '## Original Query',
-            '```kusto',
-            originalQuery,
-            '```',
-            '',
-        ];
-
-        // Add result table
-        lines.push('## Result', '');
-
-        if (result.rows.length === 0) {
-            lines.push('*No results returned.*', '');
-        } else {
-            // Build markdown table
-            lines.push('| ' + result.columns.join(' | ') + ' |');
-            lines.push('| ' + result.columns.map(() => '---').join(' | ') + ' |');
-
-            for (const row of result.rows.slice(0, 100)) { // Limit to 100 rows
-                const cells = row.map(cell => this._formatCell(cell));
-                lines.push('| ' + cells.join(' | ') + ' |');
+        // Show a message that no connection is configured
+        vscode.window.showWarningMessage(
+            'No connection configured. Add :setConnection and :setDefaultDb to execute queries.',
+            'Show Resolved Query'
+        ).then(selection => {
+            if (selection === 'Show Resolved Query') {
+                this._showResolvedQueryDocument(originalQuery, resolved);
             }
-
-            if (result.rows.length > 100) {
-                lines.push('', `*Showing first 100 of ${result.totalRows} rows.*`);
-            } else {
-                lines.push('', `*${result.totalRows} row(s) returned.*`);
-            }
-        }
-
-        // Add resolved query at end (collapsed by default conceptually)
-        lines.push(
-            '',
-            '<details>',
-            '<summary>Resolved Query (click to expand)</summary>',
-            '',
-            '```kusto',
-            resolvedQuery,
-            '```',
-            '</details>',
-        );
-
-        return lines.join('\n');
-    }
-
-    private _formatError(
-        originalQuery: string,
-        resolvedQuery: string,
-        error: unknown,
-        timestamp: string,
-        cluster: string,
-        database: string
-    ): string {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        return [
-            '# Kusto Query Error',
-            '',
-            `*Attempted at ${timestamp}*`,
-            '',
-            `**Cluster:** \`${cluster}\`  `,
-            `**Database:** \`${database}\``,
-            '',
-            '## Error',
-            '```',
-            errorMessage,
-            '```',
-            '',
-            '## Original Query',
-            '```kusto',
-            originalQuery,
-            '```',
-            '',
-            '## Resolved Query',
-            '```kusto',
-            resolvedQuery,
-            '```',
-        ].join('\n');
-    }
-
-    private _formatCell(value: unknown): string {
-        if (value === null || value === undefined) {
-            return '*null*';
-        }
-        if (typeof value === 'object') {
-            return '`' + JSON.stringify(value) + '`';
-        }
-        return String(value).replace(/\|/g, '\\|').replace(/\n/g, ' ');
-    }
-
-    private async _showResultDocument(content: string): Promise<void> {
-        const resultUri = vscode.Uri.parse(`kusto-result:Query Result.md`).with({
-            query: content
         });
+    }
 
-        const doc = await vscode.workspace.openTextDocument(resultUri);
+    private async _showResolvedQueryDocument(originalQuery: string, resolved: ResolvedKustoDocument): Promise<void> {
+        const content = [
+            '// Original Query',
+            originalQuery,
+            '',
+            '// Resolved Query (with definitions)',
+            resolved.virtualText,
+        ].join('\n');
+
+        const doc = await vscode.workspace.openTextDocument({
+            language: 'kusto',
+            content
+        });
         await vscode.window.showTextDocument(doc, {
             viewColumn: vscode.ViewColumn.Beside,
             preview: true,
-            preserveFocus: false,
         });
-
-        await vscode.languages.setTextDocumentLanguage(doc, 'markdown');
     }
 }

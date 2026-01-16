@@ -29,6 +29,7 @@ export function getLanguageServiceForInstructions(
     }
 
     // Trigger background fetch, return default for now
+    console.log(`[LanguageService] Cache miss for ${cluster}/${database} - fetching schema...`);
     fetchSchemaInBackground(cluster, database, authType);
     return cache.getDefault();
 }
@@ -41,10 +42,19 @@ export function fetchSchemaInBackground(cluster: string, database: string, authT
     const cache = getLanguageServiceCache();
     const client = getKustoClient();
 
+    // Check if already cached or pending
+    if (cache.has(cluster, database)) {
+        return;
+    }
+
+    const startTime = performance.now();
+
     cache.getOrCreate(cluster, database, async () => {
-        return client.getSchema(cluster, database, authType);
+        const schema = await client.getSchema(cluster, database, authType);
+        console.log(`[LanguageService] Schema fetched for ${cluster}/${database} in ${(performance.now() - startTime).toFixed(0)}ms`);
+        return schema;
     }).catch(err => {
-        console.error(`Failed to fetch schema for ${cluster}/${database}:`, err);
+        console.error(`[LanguageService] Failed to fetch schema for ${cluster}/${database}:`, err);
     });
 }
 

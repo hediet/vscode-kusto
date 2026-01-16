@@ -10,4 +10,7 @@ export {
     type SemanticToken,
     type SemanticTokenType,
     type Hover,
+    type RelatedInfo,
+    type RelatedElement,
+    type RelatedElementKind,
 } from './kustoLanguageService';

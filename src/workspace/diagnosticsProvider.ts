@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { autorun } from '@vscode/observables';
+import { autorun, ISettableObservable, observableValue } from '@vscode/observables';
 import { Disposable } from '../utils/disposables';
 import { MutableProject } from '../language/workspace/mutableProject';
 import { ResolvedDocumentAdapter } from '../language/akusto/resolvedDocumentAdapter';
@@ -7,11 +7,13 @@ import { AkustoDocument } from '../language/akusto/akustoDocument';
 import { getLanguageServiceForInstructions } from './languageServiceResolver';
 
 /**
- * Provides diagnostics for Kusto documents using observables.
- * Automatically updates diagnostics when documents change.
+ * Provides diagnostics for Kusto documents.
+ * Only computes diagnostics for the active editor's document to avoid performance issues
+ * with large definition files.
  */
 export class DiagnosticsProvider extends Disposable {
     private readonly diagnostics: vscode.DiagnosticCollection;
+    private readonly _activeUri: ISettableObservable<string | undefined>;
 
     constructor(private readonly model: MutableProject) {
         super();
@@ -19,21 +21,60 @@ export class DiagnosticsProvider extends Disposable {
         this.diagnostics = vscode.languages.createDiagnosticCollection('kusto');
         this._register({ dispose: () => this.diagnostics.dispose() });
 
-        // Autorun: update diagnostics whenever documents change
+        this._activeUri = observableValue('DiagnosticsProvider.activeUri', undefined as string | undefined);
+
+        // Track active editor changes
+        this._register(vscode.window.onDidChangeActiveTextEditor(editor => {
+            this._onActiveEditorChanged(editor);
+        }));
+
+        // Initial update for current active editor
+        this._onActiveEditorChanged(vscode.window.activeTextEditor);
+
+        // Autorun: update diagnostics for active document when it changes
         this._register(autorun(reader => {
-            /** @description Update Kusto diagnostics */
+            /** @description Update Kusto diagnostics for active document */
             const documents = this.model.documents.read(reader);
             const project = this.model.project.read(reader);
+            const activeUri = this._activeUri.read(reader);
 
-            // Clear all diagnostics first
-            this.diagnostics.clear();
+            if (!activeUri) {
+                return;
+            }
 
-            // Compute diagnostics for each document
-            for (const [uri, doc] of documents) {
-                const vsDiagnostics = this._computeDiagnostics(doc, project);
-                this.diagnostics.set(vscode.Uri.parse(uri), vsDiagnostics);
+            const doc = documents.get(activeUri);
+            if (!doc) {
+                return;
+            }
+
+            const startTime = performance.now();
+
+            const vsDiagnostics = this._computeDiagnostics(doc, project);
+            this.diagnostics.set(vscode.Uri.parse(activeUri), vsDiagnostics);
+
+            const totalTime = performance.now() - startTime;
+            if (totalTime > 100) {
+                console.log(`[Diagnostics] Slow: ${totalTime.toFixed(0)}ms for ${vsDiagnostics.length} diagnostics`);
             }
         }));
+    }
+
+    private _onActiveEditorChanged(editor: vscode.TextEditor | undefined): void {
+        const newUri = editor?.document.languageId === 'kusto'
+            ? editor.document.uri.toString()
+            : undefined;
+
+        const currentUri = this._activeUri.get();
+        if (newUri === currentUri) {
+            return;
+        }
+
+        // Clear diagnostics for old document
+        if (currentUri) {
+            this.diagnostics.delete(vscode.Uri.parse(currentUri));
+        }
+
+        this._activeUri.set(newUri, undefined);
     }
 
     private _computeDiagnostics(
@@ -42,12 +83,17 @@ export class DiagnosticsProvider extends Disposable {
     ): vscode.Diagnostic[] {
         const results: vscode.Diagnostic[] = [];
 
-        // Get diagnostics for each fragment in the document
-        for (const fragment of doc.fragments) {
+        // Only compute diagnostics for non-definition fragments (executable queries)
+        // Skip definitions (let $name = ...) as they're not meant to run standalone
+        const executableFragments = doc.fragments.filter(f => !f.exportedName);
+
+        for (const fragment of executableFragments) {
             try {
                 const resolved = project.resolve(doc, fragment);
                 const service = getLanguageServiceForInstructions(resolved.instructions);
                 const adapter = new ResolvedDocumentAdapter(resolved, service);
+
+                // Only get diagnostics for the current document, not dependencies
                 const fragmentDiags = adapter.getDiagnosticsForDocument(doc.uri);
 
                 for (const diag of fragmentDiags) {
@@ -61,7 +107,7 @@ export class DiagnosticsProvider extends Disposable {
                     ));
                 }
             } catch (e) {
-                console.error(`DiagnosticsProvider: Error computing diagnostics for fragment:`, e);
+                // Don't log errors for every fragment - too noisy
             }
         }
 

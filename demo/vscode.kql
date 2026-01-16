@@ -2,27 +2,17 @@
 :setConnection({ type: "azureCli", cluster: "https://ddtelvscode.kusto.windows.net/" })
 :setDefaultDb("VSCode")
 
+:include("./vscode-events.kql")
 
-let $editSourcesDetails = RawEventsVSCode
-| where EventName == "monacoworkbench/edittelemetry.editsources.details"
-| extend sourceKey = tostring(Properties["sourcekey"])
-| extend modifiedCount = toint(Measures["modifiedcount"])
-| extend deltaModifiedCount = toint(Measures["deltamodifiedcount"])
-| extend trigger = tostring(Properties["trigger"])
-| extend mode = tostring(Properties["mode"])
-| project sourceKey, modifiedCount, deltaModifiedCount, trigger, mode
-
-$editSourcesDetails
+// Show available edit detail sourcekeys by count
+$events.editTelemetry.editSources.details
 | take 10
-
-
-$editSourcesDetails
-| count
-
-
-let $foo = 1
+| where BaseServerUploadTimestamp >= ago(1d)
+| summarize Count = count() by Sourcekeycleaned
+| order by Count desc
+| take 50
 
 
 
-
-
+RawEventsVSCode
+| take 10

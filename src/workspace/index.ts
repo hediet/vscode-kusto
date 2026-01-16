@@ -1,6 +1,14 @@
 export { VsCodeWatchableFileSystem } from './vscodeFileSystem';
 export { DiagnosticsProvider } from './diagnosticsProvider';
 export { CompletionProvider } from './completionProvider';
+export { DefinitionCompletionProvider } from './definitionCompletionProvider';
+export { EnumCompletionProvider } from './enumCompletionProvider';
+export { DefinitionProvider } from './definitionProvider';
 export { HoverProvider } from './hoverProvider';
 export { CodeLensProvider } from './codeLensProvider';
 export { QueryRunner } from './queryRunner';
+export { DebugDocumentProvider } from './debugDocumentProvider';
+export { SemanticTokensProvider } from './semanticTokensProvider';
+export { ResultsViewProvider } from './resultsViewProvider';
+export { RunQueryTool } from './runQueryTool';
+export { QueryHistoryModel, getQueryService, QueryService } from './queryHistoryModel';

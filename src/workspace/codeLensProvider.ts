@@ -35,6 +35,7 @@ export class CodeLensProvider extends Disposable implements vscode.CodeLensProvi
         document: vscode.TextDocument,
         _token: vscode.CancellationToken
     ): vscode.CodeLens[] {
+        const startTime = performance.now();
         const uri = document.uri.toString();
         const akustoDoc = this.model.documents.get().get(uri);
 
@@ -55,6 +56,11 @@ export class CodeLensProvider extends Disposable implements vscode.CodeLensProvi
                 arguments: [uri, fragment.range.start, fragment.range.endExclusive],
                 tooltip: 'Execute this query (Ctrl+Enter)',
             }));
+        }
+
+        const totalTime = performance.now() - startTime;
+        if (totalTime > 50) {
+            console.log(`[CodeLens] Slow: ${totalTime.toFixed(0)}ms for ${lenses.length} lenses`);
         }
 
         return lenses;

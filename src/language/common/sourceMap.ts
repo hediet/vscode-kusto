@@ -12,7 +12,7 @@ export class SourceSegment {
 		public readonly sourceUri: string,
 		/** Range in the source document */
 		public readonly sourceRange: OffsetRange
-	) {}
+	) { }
 }
 
 /**
@@ -32,7 +32,7 @@ export class SourceMap {
 		for (let i = 1; i < this.segments.length; i++) {
 			const prev = this.segments[i - 1];
 			const curr = this.segments[i];
-			
+
 			if (prev.virtualRange.endExclusive > curr.virtualRange.start) {
 				throw new Error(
 					`SourceMap segments must be sorted and non-overlapping. ` +
@@ -61,12 +61,19 @@ export class SourceMap {
 	/**
 	 * Maps a physical document location to a virtual document offset.
 	 * Returns undefined if the location is not within any segment.
+	 * @param docOffset The document offset to map
+	 * @param includeTouchingEnd If true, includes offsets at the exclusive end of segments (useful for cursor positions)
 	 */
-	fromDocumentOffset(docOffset: DocumentOffset): number | undefined {
+	fromDocumentOffset(docOffset: DocumentOffset, includeTouchingEnd: boolean = false): number | undefined {
 		for (const segment of this.segments) {
-			if (segment.sourceUri === docOffset.uri && segment.sourceRange.contains(docOffset.offset)) {
-				const localOffset = docOffset.offset - segment.sourceRange.start;
-				return segment.virtualRange.start + localOffset;
+			if (segment.sourceUri === docOffset.uri) {
+				const inRange = includeTouchingEnd
+					? segment.sourceRange.containsOrTouches(docOffset.offset)
+					: segment.sourceRange.contains(docOffset.offset);
+				if (inRange) {
+					const localOffset = docOffset.offset - segment.sourceRange.start;
+					return segment.virtualRange.start + localOffset;
+				}
 			}
 		}
 		return undefined;

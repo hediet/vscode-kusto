@@ -108,8 +108,28 @@
                     "match": "\\|"
                 },
                 {
+                    "name": "keyword.operator.assignment.kusto",
+                    "match": "="
+                },
+                {
+                    "name": "keyword.operator.range.kusto",
+                    "match": "\\.\\."
+                },
+                {
+                    "name": "keyword.operator.accessor.kusto",
+                    "match": "\\."
+                },
+                {
                     "name": "keyword.operator.comparison.kusto",
-                    "match": "==|!=|<>|<=|>=|<|>|=~|!~|in~|in|!in~|!in|has|!has|has_cs|hasprefix|hassuffix|contains|!contains|startswith|!startswith|endswith|!endswith|matches\\s+regex"
+                    "match": "\\b(between|!between|in~|!in~|in|!in|has_all|has_any|!has_cs|has_cs|!has|has|!hasprefix_cs|hasprefix_cs|!hasprefix|hasprefix|!hassuffix_cs|hassuffix_cs|!hassuffix|hassuffix|!contains_cs|contains_cs|!contains|contains|!startswith_cs|startswith_cs|!startswith|startswith|!endswith_cs|endswith_cs|!endswith|endswith|matches\\s+regex)\\b"
+                },
+                {
+                    "name": "keyword.operator.comparison.kusto",
+                    "match": "==|!=|<>|<=|>=|=~|!~"
+                },
+                {
+                    "name": "keyword.operator.comparison.kusto",
+                    "match": "<|>"
                 },
                 {
                     "name": "keyword.operator.logical.kusto",
@@ -117,7 +137,27 @@
                 },
                 {
                     "name": "keyword.operator.arithmetic.kusto",
-                    "match": "\\+|-|\\*|/|%"
+                    "match": "\\+|\\-|\\*|/|%"
+                },
+                {
+                    "name": "punctuation.separator.comma.kusto",
+                    "match": ","
+                },
+                {
+                    "name": "punctuation.separator.colon.kusto",
+                    "match": ":"
+                },
+                {
+                    "name": "punctuation.definition.bracket.kusto",
+                    "match": "[\\[\\]]"
+                },
+                {
+                    "name": "punctuation.definition.paren.kusto",
+                    "match": "[()]"
+                },
+                {
+                    "name": "punctuation.definition.brace.kusto",
+                    "match": "[{}]"
                 }
             ]
         },
@@ -128,8 +168,8 @@
                     "match": "\\b(let|set|alias|declare|pattern|restrict|access|to)\\b"
                 },
                 {
-                    "name": "keyword.operator.tabular.kusto",
-                    "match": "\\b(where|project|extend|summarize|join|union|take|limit|top|sort|order|by|asc|desc|on|kind|leftouter|rightouter|innerunique|inner|fullouter|leftanti|rightanti|leftsemi|rightsemi|lookup|mv-expand|mv-apply|parse|parse-where|evaluate|render|as|with|datatable|print|count|distinct|sample|sample-distinct|getschema|facet|find|search|fork|serialize|range|invoke|external_data|materialize|toscalar)\\b"
+                    "name": "keyword.control.tabular.kusto",
+                    "match": "\\b(mv-expand|mv-apply|parse-where|sample-distinct|project-away|project-keep|project-rename|project-reorder|extend|project|where|summarize|join|union|take|limit|top|sort|order|by|asc|desc|on|kind|leftouter|rightouter|innerunique|inner|fullouter|leftanti|rightanti|leftsemi|rightsemi|lookup|parse|evaluate|render|as|with|datatable|print|count|distinct|sample|getschema|facet|find|search|fork|serialize|range|invoke|external_data|materialize|toscalar|consume|make-series|scan|partition)\\b"
                 },
                 {
                     "name": "constant.language.kusto",

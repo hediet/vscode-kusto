@@ -28,8 +28,39 @@
 		"type": "git",
 		"url": "https://github.com/hediet/vscode-kusto"
 	},
-	"main": "./src/entry2.js",
+	"main": "./dist/extension.js",
 	"contributes": {
+		"languageModelTools": [
+			{
+				"name": "kusto_runQuery",
+				"displayName": "Run Kusto Query",
+				"toolReferenceName": "kusto",
+				"modelDescription": "Executes a Kusto (KQL) query against an Azure Data Explorer cluster. The query should use akusto syntax which supports instructions and definitions.\n\nExample query:\n```kusto\n:setConnection({ type: \"azureCli\", cluster: \"https://your-cluster.kusto.windows.net/\" })\n:setDefaultDb(\"YourDatabase\")\n:include(\"./definitions.kql\")\n\nEvents\n| where Timestamp > ago(1d)\n| count\n```\n\nThe query can include:\n- :setConnection - Configure authentication (azureCli, vscode, or defaultAzure)\n- :setDefaultDb - Set the default database\n- :include - Include definitions from other .kql files\n- Kusto query statements\n\nThe last query fragment will be executed and results returned as JSON.",
+				"icon": "$(database)",
+				"canBeReferencedInPrompt": true,
+				"inputSchema": {
+					"type": "object",
+					"properties": {
+						"queryTitle": {
+							"type": "string",
+							"description": "A short descriptive title for the query (shown in history)"
+						},
+						"query": {
+							"type": "string",
+							"description": "The full akusto query including connection setup (:setConnection, :setDefaultDb) and the Kusto query to execute"
+						},
+						"timeoutSeconds": {
+							"type": "number",
+							"description": "Optional timeout in seconds for the query execution"
+						}
+					},
+					"required": [
+						"queryTitle",
+						"query"
+					]
+				}
+			}
+		],
 		"languages": [
 			{
 				"id": "kusto",
@@ -51,6 +82,25 @@
 				"path": "./syntaxes/kusto.tmLanguage.json"
 			}
 		],
+		"viewsContainers": {
+			"panel": [
+				{
+					"id": "kusto-panel",
+					"title": "Kusto",
+					"icon": "$(database)"
+				}
+			]
+		},
+		"views": {
+			"kusto-panel": [
+				{
+					"type": "webview",
+					"id": "kusto.resultsView",
+					"name": "Kusto Results",
+					"visibility": "visible"
+				}
+			]
+		},
 		"commands": [
 			{
 				"command": "kusto.runQuery",
@@ -59,6 +109,10 @@
 			{
 				"command": "kusto.runQueryAtCursor",
 				"title": "Kusto: Run Query at Cursor"
+			},
+			{
+				"command": "kusto.debug.showAstAndResolved",
+				"title": "Kusto Debug: Show AST and Resolved Document"
 			}
 		],
 		"keybindings": [
@@ -71,20 +125,29 @@
 		]
 	},
 	"scripts": {
-		"build": "npm run build-ts && npm run build-vsix",
-		"build-ts": "tsc -p ./",
-		"build-vsix": "vsce package --out extension.vsix",
-		"vscode:prepublish": "",
-		"dev": "tsc -watch -p ./",
+		"build": "npm run build:webview && npm run build:extension",
+		"build:extension": "rollup -c rollup.config.mjs",
+		"build:webview": "cd webview && npm install && npm run build",
+		"package": "node scripts/package.js",
+		"watch": "rollup -c rollup.config.mjs --watch",
+		"watch:webview": "cd webview && npm run dev",
+		"dev": "npm run watch",
 		"test": "vitest --run",
-		"get-types": "dts dev"
+		"get-types": "dts dev",
+		"generate-telemetry": "tsx scripts/generate-telemetry-kql.ts"
 	},
 	"devDependencies": {
+		"@rollup/plugin-commonjs": "^29.0.0",
+		"@rollup/plugin-node-resolve": "^16.0.3",
+		"@rollup/plugin-replace": "^6.0.3",
+		"@rollup/plugin-typescript": "^12.3.0",
 		"@types/node": "^22.19.6",
 		"@types/vscode": "^1.101.0",
 		"@types/ws": "^8.5.10",
 		"@vscode/dts": "^0.4.0",
 		"@vscode/vsce": "^2.26.0",
+		"rollup": "^4.55.1",
+		"rollup-plugin-copy": "^3.5.0",
 		"typescript": "^5.5.0-dev.20240425",
 		"vitest": "^4.0.17"
 	},
@@ -101,9 +164,10 @@
 	},
 	"files": [
 		"dist/**/*",
-		"node_modules/",
+		"syntaxes/**/*",
+		"language-configuration.json",
 		"LICENSE",
-		"docs",
+		"docs/**/*",
 		"*.md"
 	]
 }

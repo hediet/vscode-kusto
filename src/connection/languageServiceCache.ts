@@ -66,7 +66,7 @@ export class LanguageServiceCache {
             return cached;
         }
 
-        // Return pending fetch
+        // Return pending fetch - don't start another one
         const pending = this.pending.get(key);
         if (pending) {
             return pending;

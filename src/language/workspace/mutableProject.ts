@@ -50,12 +50,16 @@ export class MutableProject implements IDisposable {
      * The document and all its transitive includes will be watched.
      */
     async addRoot(uri: string): Promise<void> {
+        console.log(`[MutableProject] addRoot called for: ${uri}`);
         const normalizedUri = this._normalizeUri(uri);
         if (this._rootUris.has(normalizedUri)) {
+            console.log(`[MutableProject] Already has root: ${normalizedUri}`);
             return;
         }
         this._rootUris.add(normalizedUri);
+        console.log(`[MutableProject] Loading and watching: ${normalizedUri}`);
         await this._loadAndWatch(normalizedUri);
+        console.log(`[MutableProject] Done loading: ${normalizedUri}, docs: ${Array.from(this._documents.get().keys()).join(', ')}`);
     }
 
     /**

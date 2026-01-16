@@ -62,6 +62,28 @@ describe('OffsetRange', () => {
 		});
 	});
 
+	describe('containsOrTouches', () => {
+		it('returns true for offset within range', () => {
+			expect(new OffsetRange(5, 10).containsOrTouches(7)).toMatchInlineSnapshot(`true`);
+		});
+
+		it('returns true for start offset', () => {
+			expect(new OffsetRange(5, 10).containsOrTouches(5)).toMatchInlineSnapshot(`true`);
+		});
+
+		it('returns true for end offset (inclusive)', () => {
+			expect(new OffsetRange(5, 10).containsOrTouches(10)).toMatchInlineSnapshot(`true`);
+		});
+
+		it('returns false for offset before range', () => {
+			expect(new OffsetRange(5, 10).containsOrTouches(3)).toMatchInlineSnapshot(`false`);
+		});
+
+		it('returns false for offset after range', () => {
+			expect(new OffsetRange(5, 10).containsOrTouches(11)).toMatchInlineSnapshot(`false`);
+		});
+	});
+
 	describe('containsRange', () => {
 		it('returns true when other is fully contained', () => {
 			expect(new OffsetRange(0, 10).containsRange(new OffsetRange(2, 8))).toMatchInlineSnapshot(`true`);
