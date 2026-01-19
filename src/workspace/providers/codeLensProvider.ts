@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { MutableProject } from '../language/workspace/mutableProject';
+import { MutableProject } from '../../language/workspace/mutableProject';
 import { autorun } from '@vscode/observables';
-import { Disposable } from '../utils/disposables';
+import { Disposable } from '../../utils/disposables';
 
 /**
  * Provides CodeLens for running Kusto queries.
@@ -14,7 +14,6 @@ export class CodeLensProvider extends Disposable implements vscode.CodeLensProvi
     constructor(private readonly model: MutableProject) {
         super();
 
-        // Register provider
         this._register(
             vscode.languages.registerCodeLensProvider(
                 { language: 'kusto', scheme: 'file' },
@@ -22,7 +21,6 @@ export class CodeLensProvider extends Disposable implements vscode.CodeLensProvi
             )
         );
 
-        // Refresh code lenses when documents change
         this._register(
             autorun(reader => {
                 this.model.documents.read(reader);
@@ -31,10 +29,7 @@ export class CodeLensProvider extends Disposable implements vscode.CodeLensProvi
         );
     }
 
-    provideCodeLenses(
-        document: vscode.TextDocument,
-        _token: vscode.CancellationToken
-    ): vscode.CodeLens[] {
+    provideCodeLenses(document: vscode.TextDocument, _token: vscode.CancellationToken): vscode.CodeLens[] {
         const startTime = performance.now();
         const uri = document.uri.toString();
         const akustoDoc = this.model.documents.get().get(uri);
@@ -49,7 +44,6 @@ export class CodeLensProvider extends Disposable implements vscode.CodeLensProvi
             const startPos = document.positionAt(fragment.range.start);
             const range = new vscode.Range(startPos, startPos);
 
-            // Show "Run Query" for any fragment
             lenses.push(new vscode.CodeLens(range, {
                 title: fragment.isDefinition ? '▶ Run Definition' : '▶ Run Query',
                 command: 'kusto.runQuery',

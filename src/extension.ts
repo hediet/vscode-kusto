@@ -1,4 +1,4 @@
-import * as path from "path";
+import '@kusto/language-service-next/bridge.js';
 import { ExtensionContext, window } from "vscode";
 import { Disposable } from "./utils/disposables";
 import {
@@ -19,16 +19,6 @@ import {
 } from "./workspace";
 import { MutableProject } from "./language/workspace/mutableProject";
 
-// Hot reload setup - eliminated in production build via dead code elimination
-if (process.env.KUSTO_HOT_RELOAD === 'true') {
-    // @ts-ignore - dynamic require for hot reload
-    const hot = require("@hediet/node-reload/node");
-    hot.enableHotReload({
-        entryModule: module,
-        loggingFileRoot: path.join(__dirname, '..'),
-        skipIfEnabled: true,
-    });
-}
 
 export class Extension extends Disposable {
     private readonly fileSystem: VsCodeWatchableFileSystem;
@@ -93,29 +83,4 @@ export class Extension extends Disposable {
         this._register(new DebugDocumentProvider(this.project));
         this._register(new SemanticTokensProvider(this.project));
     }
-}
-
-let extension: Extension | undefined;
-
-export function activate(context: ExtensionContext): void {
-    if (process.env.KUSTO_HOT_RELOAD === 'true') {
-        // Hot reload mode - use hotReloadExportedItem for live updates
-        // @ts-ignore - dynamic require for hot reload
-        const { hotReloadExportedItem } = require("@hediet/node-reload");
-        context.subscriptions.push(
-            hotReloadExportedItem(Extension, (Ext: typeof Extension) => {
-                extension = new Ext(context);
-                return extension;
-            })
-        );
-    } else {
-        // Production mode - simple instantiation
-        extension = new Extension(context);
-        context.subscriptions.push(extension);
-    }
-}
-
-export function deactivate(): void {
-    extension?.dispose();
-    extension = undefined;
 }

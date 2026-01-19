@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { CompletionKind } from '../language/kusto/kustoLanguageService';
-import { ResolvedDocumentAdapter, SourceTextProvider, extractDocumentation } from '../language/akusto/resolvedDocumentAdapter';
-import { DocumentOffset } from '../language/common/documentOffset';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
-import { ResolvedKustoDocument } from '../language/akusto/resolvedKustoDocument';
-import { KustoLanguageService } from '../language/kusto/kustoLanguageService';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { CompletionKind } from '../../language/kusto/kustoLanguageService';
+import { ResolvedDocumentAdapter, SourceTextProvider, extractDocumentation } from '../../language/akusto/resolvedDocumentAdapter';
+import { DocumentOffset } from '../../language/common/documentOffset';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
+import { ResolvedKustoDocument } from '../../language/akusto/resolvedKustoDocument';
+import { KustoLanguageService } from '../../language/kusto/kustoLanguageService';
 
 /**
  * Source text provider that reads from the MutableProject's documents.
@@ -102,8 +102,6 @@ export class CompletionProvider extends Disposable implements vscode.CompletionI
                 console.log(`[Completions] Slow: ${totalTime.toFixed(0)}ms (resolve: ${resolveTime.toFixed(0)}ms, service: ${serviceTime.toFixed(0)}ms, completions: ${adapterTime.toFixed(0)}ms) - ${completions.length} items`);
             }
 
-            // Convert to VS Code completion items with smart sorting
-            // Columns appear first, then variables, then other items
             return completions.map(item => {
                 const vsItem = new vscode.CompletionItem(item.label, this._mapKind(item.kind));
                 if (item.detail) {
@@ -118,10 +116,8 @@ export class CompletionProvider extends Disposable implements vscode.CompletionI
                 if (item.filterText) {
                     vsItem.filterText = item.filterText;
                 }
-                // Sort by kind: columns first, then variables, then everything else
-                vsItem.sortText = `${this._getSortPrefix(item.kind)}_${item.label}`;
+                vsItem.sortText = `${this._getSortPrefix(item.kind, item.label)}_${item.label}`;
 
-                // Mark column completions for lazy documentation resolution
                 if (item.kind === 'column' && !item.documentation) {
                     // Store metadata for resolveCompletionItem
                     (vsItem as any)._needsDocLookup = true;
@@ -236,19 +232,19 @@ export class CompletionProvider extends Disposable implements vscode.CompletionI
      * Get sort prefix to group completions by relevance.
      * Lower numbers appear first in the completion list.
      */
-    private _getSortPrefix(kind: CompletionKind): string {
+    private _getSortPrefix(kind: CompletionKind, label?: string): string {
         switch (kind) {
-            case 'column': return '0'; // Columns first - most commonly needed
-            case 'variable': return '1'; // Then variables (let bindings)
-            case 'table': return '2'; // Then tables
-            case 'function': return '3'; // Functions after columns
-            case 'operator': return '4'; // Operators
-            case 'keyword': return '5'; // Keywords
-            case 'database': return '6';
-            case 'cluster': return '7';
-            case 'type': return '8';
-            case 'snippet': return '9';
-            default: return '9';
+            case 'column': return label?.startsWith('_') ? '02' : '01';
+            case 'variable': return '11';
+            case 'table': return '12';
+            case 'function': return '13';
+            case 'operator': return '14';
+            case 'keyword': return '15';
+            case 'database': return '16';
+            case 'cluster': return '17';
+            case 'type': return '18';
+            case 'snippet': return '19';
+            default: return '19';
         }
     }
 }

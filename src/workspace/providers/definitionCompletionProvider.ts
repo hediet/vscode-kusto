@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
 
 /**
  * Provides completions for $-prefixed definitions.
@@ -78,7 +78,7 @@ export class DefinitionCompletionProvider extends Disposable implements vscode.C
             // Create completion items
             const items: vscode.CompletionItem[] = [];
 
-            for (const [name, { source, isLocal }] of allDefs) {
+            for (const [name, { isLocal }] of allDefs) {
                 // The definition name starts with $
                 if (!name.startsWith('$')) {
                     continue;

@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { detectComparisonContext, extractEnumVariants } from '../language/akusto/enumParser';
-import { extractDocumentation } from '../language/akusto/resolvedDocumentAdapter';
-import { DocumentOffset } from '../language/common/documentOffset';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { detectComparisonContext, extractEnumVariants } from '../../language/akusto/enumParser';
+import { extractDocumentation } from '../../language/akusto/resolvedDocumentAdapter';
+import { DocumentOffset } from '../../language/common/documentOffset';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
 
 /**
  * Provides enum value completions when typing `column == "`.

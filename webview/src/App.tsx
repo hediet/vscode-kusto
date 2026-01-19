@@ -342,7 +342,7 @@ function App() {
         case 'fullData': {
           // Cache the full data
           setCachedFullData(prev => new Map(prev).set(message.id, message.data));
-          
+
           // If this is for the currently selected execution, update display
           if (message.id === selectedExecutionId) {
             const exec = executions.find(e => e.id === message.id);
@@ -551,49 +551,49 @@ function App() {
                     : new Date(exec.startTime).toLocaleTimeString();
                   const cachedData = cachedFullData.get(exec.id);
                   return (
-                  <div
-                    key={exec.id}
-                    className={`history-item ${selectedExecutionId === exec.id ? 'selected' : ''} ${exec.status}`}
-                    onClick={() => handleSelectHistoryItem(exec)}
-                  >
-                    <div className="history-item-header">
-                      <span className="history-time">
-                        {isAI && <span className="history-ai-badge" title="Query from AI">AI</span>}
-                        {exec.status === 'running' ? `${elapsedSeconds}s` : timestamp}
-                      </span>
-                      {exec.status !== 'running' && (
-                        <button
-                          className="history-delete"
-                          onClick={(e) => handleDeleteHistoryItem(e, exec.id)}
-                          title="Remove from history"
-                        >
-                          ×
-                        </button>
-                      )}
-                      {exec.status === 'running' && (
-                        <button
-                          className="history-cancel"
-                          onClick={(e) => { e.stopPropagation(); handleCancel(exec.id); }}
-                          title="Cancel query"
-                        >
-                          ×
-                        </button>
-                      )}
+                    <div
+                      key={exec.id}
+                      className={`history-item ${selectedExecutionId === exec.id ? 'selected' : ''} ${exec.status}`}
+                      onClick={() => handleSelectHistoryItem(exec)}
+                    >
+                      <div className="history-item-header">
+                        <span className="history-time">
+                          {isAI && <span className="history-ai-badge" title="Query from AI">AI</span>}
+                          {exec.status === 'running' ? `${elapsedSeconds}s` : timestamp}
+                        </span>
+                        {exec.status !== 'running' && (
+                          <button
+                            className="history-delete"
+                            onClick={(e) => handleDeleteHistoryItem(e, exec.id)}
+                            title="Remove from history"
+                          >
+                            ×
+                          </button>
+                        )}
+                        {exec.status === 'running' && (
+                          <button
+                            className="history-cancel"
+                            onClick={(e) => { e.stopPropagation(); handleCancel(exec.id); }}
+                            title="Cancel query"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      <div className="history-query" title={displayQuery}>
+                        {displayQuery.length > 60
+                          ? displayQuery.substring(0, 57) + '...'
+                          : displayQuery}
+                      </div>
+                      <div className="history-meta">
+                        <span>{exec.database}</span>
+                        {exec.status === 'success' && exec.totalRows !== undefined && <span>{exec.totalRows} rows</span>}
+                        {exec.status === 'success' && exec.totalRows === undefined && cachedData?.result && <span>{cachedData.result.totalRows} rows</span>}
+                        {exec.status === 'error' && <span className="history-error-badge">Error</span>}
+                        {exec.status === 'running' && <span className="history-running-badge">Running</span>}
+                        {exec.status === 'cancelled' && <span className="history-cancelled-badge">Cancelled</span>}
+                      </div>
                     </div>
-                    <div className="history-query" title={displayQuery}>
-                      {displayQuery.length > 60
-                        ? displayQuery.substring(0, 57) + '...'
-                        : displayQuery}
-                    </div>
-                    <div className="history-meta">
-                      <span>{exec.database}</span>
-                      {exec.status === 'success' && exec.totalRows !== undefined && <span>{exec.totalRows} rows</span>}
-                      {exec.status === 'success' && exec.totalRows === undefined && cachedData?.result && <span>{cachedData.result.totalRows} rows</span>}
-                      {exec.status === 'error' && <span className="history-error-badge">Error</span>}
-                      {exec.status === 'running' && <span className="history-running-badge">Running</span>}
-                      {exec.status === 'cancelled' && <span className="history-cancelled-badge">Cancelled</span>}
-                    </div>
-                  </div>
                   );
                 })
               )}

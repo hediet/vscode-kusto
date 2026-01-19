@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { autorun, observableValue, ISettableObservable } from '@vscode/observables';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { AkustoDocument } from '../language/akusto/akustoDocument';
-import { DocumentOffset } from '../language/common/documentOffset';
-import { ResolvedDocumentAdapter } from '../language/akusto/resolvedDocumentAdapter';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { AkustoDocument } from '../../language/akusto/akustoDocument';
+import { DocumentOffset } from '../../language/common/documentOffset';
+import { ResolvedDocumentAdapter } from '../../language/akusto/resolvedDocumentAdapter';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
 
 const DEBUG_SCHEME = 'kusto-debug';
 
@@ -109,7 +109,7 @@ export class DebugDocumentProvider extends Disposable implements vscode.TextDocu
     }
 
     /** Find document in project, handling potential case differences on Windows */
-    private _findDocument(project: import('../language/akusto/akustoProject').AkustoProject, uri: string): AkustoDocument | undefined {
+    private _findDocument(project: import('../../language/akusto/akustoProject').AkustoProject, uri: string): AkustoDocument | undefined {
         // Try exact match first
         const exact = project.documents.get(uri);
         if (exact) {

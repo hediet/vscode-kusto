@@ -45,43 +45,23 @@ function createCredential(authType: AuthType): TokenCredential {
     }
 }
 
-/**
- * Kusto visualization properties from render operator.
- */
 export interface KustoVisualization {
-    /** Visualization type (table, linechart, barchart, etc.) */
     type: string;
-    /** X-axis column */
     xColumn?: string;
-    /** Y-axis columns */
     yColumns?: string[];
-    /** Series column (for grouping) */
     series?: string;
-    /** Chart title */
     title?: string;
-    /** X-axis title */
     xTitle?: string;
-    /** Y-axis title */
     yTitle?: string;
-    /** Legend visibility */
     legend?: string;
-    /** Y-axis scale (linear, log) */
     yScale?: string;
-    /** Additional properties */
     [key: string]: unknown;
 }
 
-/**
- * Query result from Kusto.
- */
 export interface QueryResult {
-    /** Column names */
     columns: string[];
-    /** Row data (array of arrays) */
     rows: unknown[][];
-    /** Total row count (may be more than returned rows if truncated) */
     totalRows: number;
-    /** Visualization properties from render operator */
     visualization?: KustoVisualization;
 }
 

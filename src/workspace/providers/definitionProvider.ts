@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { ResolvedDocumentAdapter } from '../language/akusto/resolvedDocumentAdapter';
-import { getDefinitionNameAtOffset } from '../language/akusto/definitionInfo';
-import { DocumentOffset } from '../language/common/documentOffset';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { ResolvedDocumentAdapter } from '../../language/akusto/resolvedDocumentAdapter';
+import { getDefinitionNameAtOffset } from '../../language/akusto/definitionInfo';
+import { DocumentOffset } from '../../language/common/documentOffset';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
 
 /**
  * Provides "Go to Definition" for Kusto documents.
@@ -43,10 +43,10 @@ export class DefinitionProvider extends Disposable implements vscode.DefinitionP
             const defInfo = project.getDefinitionInfo(defName);
             if (defInfo) {
                 const targetUri = vscode.Uri.parse(defInfo.uri);
-                const targetDoc = this.model.documents.get().get(defInfo.uri);
-                if (targetDoc) {
-                    const pos = this._offsetToPosition(targetDoc.text, defInfo.nameRange.start);
-                    const endPos = this._offsetToPosition(targetDoc.text, defInfo.nameRange.endExclusive);
+                const targetVsDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === defInfo.uri);
+                if (targetVsDoc) {
+                    const pos = targetVsDoc.positionAt(defInfo.nameRange.start);
+                    const endPos = targetVsDoc.positionAt(defInfo.nameRange.endExclusive);
                     return new vscode.Location(targetUri, new vscode.Range(pos, endPos));
                 }
             }
@@ -79,8 +79,8 @@ export class DefinitionProvider extends Disposable implements vscode.DefinitionP
             const currentElement = relatedInfo.elements[relatedInfo.currentIndex];
             let originSelectionRange: vscode.Range | undefined;
             if (currentElement && currentElement.location.uri === uri) {
-                const originStart = this._offsetToPosition(text, currentElement.location.offset);
-                const originEnd = this._offsetToPosition(text, currentElement.location.offset + currentElement.length);
+                const originStart = document.positionAt(currentElement.location.offset);
+                const originEnd = document.positionAt(currentElement.location.offset + currentElement.length);
                 originSelectionRange = new vscode.Range(originStart, originEnd);
             }
 
@@ -89,12 +89,11 @@ export class DefinitionProvider extends Disposable implements vscode.DefinitionP
             for (const decl of declarations) {
                 const targetUri = vscode.Uri.parse(decl.location.uri);
 
-                // Get the document to convert offset to position
-                const targetDoc = this.model.documents.get().get(decl.location.uri);
-                if (targetDoc) {
-                    // Calculate position from offset using document text
-                    const pos = this._offsetToPosition(targetDoc.text, decl.location.offset);
-                    const endPos = this._offsetToPosition(targetDoc.text, decl.location.offset + decl.length);
+                // Get the VS Code document to convert offset to position
+                const targetVsDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === decl.location.uri);
+                if (targetVsDoc) {
+                    const pos = targetVsDoc.positionAt(decl.location.offset);
+                    const endPos = targetVsDoc.positionAt(decl.location.offset + decl.length);
                     const targetRange = new vscode.Range(pos, endPos);
 
                     locationLinks.push({
@@ -111,21 +110,5 @@ export class DefinitionProvider extends Disposable implements vscode.DefinitionP
             console.error('[Definition] Error:', e);
             return null;
         }
-    }
-
-    /** Convert offset to VS Code Position using document text. */
-    private _offsetToPosition(text: string, offset: number): vscode.Position {
-        let line = 0;
-        let lastLineStart = 0;
-
-        for (let i = 0; i < offset && i < text.length; i++) {
-            if (text[i] === '\n') {
-                line++;
-                lastLineStart = i + 1;
-            }
-        }
-
-        const column = offset - lastLineStart;
-        return new vscode.Position(line, column);
     }
 }

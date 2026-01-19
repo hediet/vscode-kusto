@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import { autorun, ISettableObservable, observableValue } from '@vscode/observables';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { ResolvedDocumentAdapter } from '../language/akusto/resolvedDocumentAdapter';
-import { AkustoDocument } from '../language/akusto/akustoDocument';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { ResolvedDocumentAdapter } from '../../language/akusto/resolvedDocumentAdapter';
+import { AkustoDocument } from '../../language/akusto/akustoDocument';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
+import { AkustoProject } from '../../language';
 
 /**
  * Provides diagnostics for Kusto documents.
@@ -79,9 +80,15 @@ export class DiagnosticsProvider extends Disposable {
 
     private _computeDiagnostics(
         doc: AkustoDocument,
-        project: import('../language/akusto/akustoProject').AkustoProject
+        project: AkustoProject
     ): vscode.Diagnostic[] {
         const results: vscode.Diagnostic[] = [];
+
+        // Get the VS Code document for position conversion
+        const vsDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === doc.uri);
+        if (!vsDoc) {
+            return results;
+        }
 
         // Only compute diagnostics for non-definition fragments (executable queries)
         // Skip definitions (let $name = ...) as they're not meant to run standalone
@@ -97,8 +104,8 @@ export class DiagnosticsProvider extends Disposable {
                 const fragmentDiags = adapter.getDiagnosticsForDocument(doc.uri);
 
                 for (const diag of fragmentDiags) {
-                    const startPos = this._offsetToPosition(doc.text, diag.location.offset);
-                    const endPos = this._offsetToPosition(doc.text, diag.location.offset + diag.length);
+                    const startPos = vsDoc.positionAt(diag.location.offset);
+                    const endPos = vsDoc.positionAt(diag.location.offset + diag.length);
 
                     results.push(new vscode.Diagnostic(
                         new vscode.Range(startPos, endPos),
@@ -112,20 +119,6 @@ export class DiagnosticsProvider extends Disposable {
         }
 
         return results;
-    }
-
-    private _offsetToPosition(text: string, offset: number): vscode.Position {
-        let line = 0;
-        let col = 0;
-        for (let i = 0; i < offset && i < text.length; i++) {
-            if (text[i] === '\n') {
-                line++;
-                col = 0;
-            } else {
-                col++;
-            }
-        }
-        return new vscode.Position(line, col);
     }
 
     private _mapSeverity(severity: string): vscode.DiagnosticSeverity {

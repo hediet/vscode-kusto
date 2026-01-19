@@ -12,7 +12,11 @@ $events.editTelemetry.editSources.details
 | order by Count desc
 | take 50
 
-
+$events.UnhandledError
+| project Callstack
+| take 100
 
 RawEventsVSCode
+| where EventName == "monacoworkbench/unhandlederror"
+| project Callstack = tostring(Properties["callstack"])
 | take 10

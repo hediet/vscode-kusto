@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { ResolvedDocumentAdapter } from '../language/akusto/resolvedDocumentAdapter';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
-import { SemanticTokenType } from '../language/kusto/kustoLanguageService';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { ResolvedDocumentAdapter } from '../../language/akusto/resolvedDocumentAdapter';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
+import { SemanticTokenType } from '../../language/kusto/kustoLanguageService';
 
 /**
  * Token types for semantic highlighting.
@@ -51,7 +51,6 @@ export class SemanticTokensProvider extends Disposable implements vscode.Documen
     ): vscode.SemanticTokens | null {
         const startTime = performance.now();
         const uri = document.uri.toString();
-        const text = document.getText();
 
         // Get current document from model
         const doc = this.model.documents.get().get(uri);
@@ -93,8 +92,8 @@ export class SemanticTokensProvider extends Disposable implements vscode.Documen
 
             // Convert offset-based tokens to line/character positions
             for (const token of allTokens) {
-                const startPos = this._offsetToPosition(text, token.offset);
-                const endPos = this._offsetToPosition(text, token.offset + token.length);
+                const startPos = document.positionAt(token.offset);
+                const endPos = document.positionAt(token.offset + token.length);
 
                 // Semantic tokens must be single-line; split multi-line tokens
                 if (startPos.line === endPos.line) {
@@ -105,7 +104,7 @@ export class SemanticTokensProvider extends Disposable implements vscode.Documen
                     );
                 } else {
                     // For multi-line tokens (e.g., multi-line strings), just use first line
-                    const lineEnd = new vscode.Position(startPos.line, text.split('\n')[startPos.line]?.length ?? 0);
+                    const lineEnd = document.lineAt(startPos.line).range.end;
                     builder.push(
                         new vscode.Range(startPos, lineEnd),
                         token.type,
@@ -124,19 +123,5 @@ export class SemanticTokensProvider extends Disposable implements vscode.Documen
             console.error('SemanticTokensProvider: Error getting tokens:', e);
             return null;
         }
-    }
-
-    private _offsetToPosition(text: string, offset: number): vscode.Position {
-        let line = 0;
-        let col = 0;
-        for (let i = 0; i < offset && i < text.length; i++) {
-            if (text[i] === '\n') {
-                line++;
-                col = 0;
-            } else {
-                col++;
-            }
-        }
-        return new vscode.Position(line, col);
     }
 }

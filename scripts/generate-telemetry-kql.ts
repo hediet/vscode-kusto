@@ -87,7 +87,7 @@ interface TelemetrySchema {
 
 /**
  * Base columns from the RawEventsVSCode table.
- * These are renamed with "Base" prefix to distinguish from extracted properties.
+ * These are renamed with "_" prefix to distinguish from extracted properties.
  */
 const BASE_COLUMNS = [
     'AbexpAssignmentContext',
@@ -604,12 +604,12 @@ function findEventSource(
 // ============================================================================
 
 /**
- * Generates the $base let statement with project-rename.
- * This is more compact than individual extend statements.
+ * Generates the $base let statement with multi-line project.
+ * Projects base columns with "_" prefix.
  */
 function generateBaseDefinition(): string {
-    const renames = BASE_COLUMNS.map(col => `Base${col} = ${col}`);
-    return `let $base = RawEventsVSCode\n| project-rename ${renames.join(', ')};`;
+    const projections = BASE_COLUMNS.map(col => `    _${col} = ${col}`);
+    return `let $base = RawEventsVSCode\n| project\n${projections.join(',\n')};`;
 }
 
 /**
@@ -706,7 +706,7 @@ function generateEventKql(
 
     // Start the let statement (using $base which has renamed columns)
     lines.push(`let ${varName} = $base`);
-    lines.push(`| where BaseEventName == "${fullEventName.toLowerCase()}"`);
+    lines.push(`| where _EventName == "${fullEventName.toLowerCase()}"`);
 
     // Build a map of original property casing from source file
     let propertyCasing = new Map<string, string>();
@@ -715,8 +715,8 @@ function generateEventKql(
         propertyCasing = resolver.findPropertyCasing(sourceLocation.filePath, lowercaseKeys);
     }
 
-    // Add extend statements for each property
-    const projectFields: string[] = [];
+    // Collect property projections for multi-line project
+    const propertyProjections: { comment: string[]; projection: string }[] = [];
 
     for (const { name, prop } of properties) {
         const { accessor, converter } = getKqlType(prop);
@@ -753,26 +753,42 @@ function generateEventKql(
             propDocLines.push(commentText);
         }
         
-        // Write property comments using single-line format
+        // Collect comments for this property
+        const commentLines: string[] = [];
         if (propDocLines.length > 0 || enumVariantLines.length > 0) {
             for (const docLine of propDocLines) {
                 const wrappedLines = wrapText(docLine, 100);
                 for (const line of wrappedLines) {
-                    lines.push(`// ${line}`);
+                    commentLines.push(`    // ${line}`);
                 }
             }
             for (const enumLine of enumVariantLines) {
-                lines.push(`// ${enumLine}`);
+                commentLines.push(`    // ${enumLine}`);
             }
         }
         
-        lines.push(`| extend ${columnName} = ${converter}(${accessor}["${propKey}"])`);
-        projectFields.push(columnName);
+        propertyProjections.push({
+            comment: commentLines,
+            projection: `    ${columnName} = ${converter}(${accessor}["${propKey}"])`
+        });
     }
 
-    // Add project statement (base columns come from $base, then extracted properties)
-    if (projectFields.length > 0) {
-        lines.push(`| project Base*, ${projectFields.join(', ')}`);
+    // Generate multi-line project statement
+    if (propertyProjections.length > 0) {
+        lines.push(`| project`);
+        // First add base columns (they come from $base with _* names)
+        lines.push(`    _*,`);
+        // Then add extracted properties with their comments
+        for (let i = 0; i < propertyProjections.length; i++) {
+            const { comment, projection } = propertyProjections[i];
+            // Add property comments
+            for (const c of comment) {
+                lines.push(c);
+            }
+            // Add projection with comma (except for last one)
+            const isLast = i === propertyProjections.length - 1;
+            lines.push(isLast ? projection : `${projection},`);
+        }
     }
 
     return lines.join('\n');

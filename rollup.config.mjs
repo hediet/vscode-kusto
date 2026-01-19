@@ -3,16 +3,18 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
 import copy from 'rollup-plugin-copy';
+import json from '@rollup/plugin-json';
 
 export default {
-	input: 'src/extension.ts',
+	input: 'src/entry.ts',
 	output: {
-		file: 'dist/extension.js',
+		file: 'dist/entry.js',
 		format: 'cjs',
 		sourcemap: true,
 		exports: 'named',
 		// Ensure proper CommonJS interop
 		interop: 'auto',
+		inlineDynamicImports: true,
 	},
 	external: [
 		// VS Code API is provided by the runtime
@@ -38,17 +40,9 @@ export default {
 		'querystring',
 		'string_decoder',
 		'punycode',
-		// Dependencies that should remain external
-		'@kusto/language-service-next',
-		'@azure/identity',
-		'@azure/identity-vscode',
-		'azure-kusto-data',
-		'@vscode/observables',
+
 		'ws',
 		'devtools-protocol',
-		// Hot reload - only used in dev, eliminated in prod
-		'@hediet/node-reload',
-		'@hediet/node-reload/node',
 	],
 	plugins: [
 		replace({
@@ -61,6 +55,7 @@ export default {
 			preferBuiltins: true,
 			extensions: ['.ts', '.js'],
 		}),
+		json(),
 		commonjs(),
 		typescript({
 			tsconfig: './tsconfig.json',

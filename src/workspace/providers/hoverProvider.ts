@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { Disposable } from '../utils/disposables';
-import { MutableProject } from '../language/workspace/mutableProject';
-import { ResolvedDocumentAdapter, SourceTextProvider } from '../language/akusto/resolvedDocumentAdapter';
-import { getDefinitionNameAtOffset } from '../language/akusto/definitionInfo';
-import { DocumentOffset } from '../language/common/documentOffset';
-import { getLanguageServiceForInstructions } from './languageServiceResolver';
+import { Disposable } from '../../utils/disposables';
+import { MutableProject } from '../../language/workspace/mutableProject';
+import { ResolvedDocumentAdapter, SourceTextProvider } from '../../language/akusto/resolvedDocumentAdapter';
+import { getDefinitionNameAtOffset } from '../../language/akusto/definitionInfo';
+import { DocumentOffset } from '../../language/common/documentOffset';
+import { getLanguageServiceForInstructions } from '../languageServiceResolver';
 
 /**
  * Source text provider that reads from the MutableProject's documents.

@@ -93,10 +93,10 @@ export class RunQueryTool extends Disposable {
     ): Promise<vscode.LanguageModelToolResult> {
         // Parse the query using akusto infrastructure
         const tempUri = `akusto://chat-query/${Date.now()}.kql`;
-        
+
         // Create a temporary document
         const akustoDoc = AkustoDocument.parse(tempUri, query);
-        
+
         // Get the last fragment (the actual query to run)
         const fragments = akustoDoc.fragments;
         if (fragments.length === 0) {
@@ -106,7 +106,7 @@ export class RunQueryTool extends Disposable {
         }
 
         const lastFragment = fragments[fragments.length - 1];
-        
+
         // Resolve the query using the project
         const project = this.model.project.get();
         const resolved = project.resolve(akustoDoc, lastFragment);
@@ -160,7 +160,7 @@ export class RunQueryTool extends Disposable {
             const result = await this._waitForExecution(execution);
 
             if (execution.signal.aborted) {
-                const message = timeoutState.timedOut 
+                const message = timeoutState.timedOut
                     ? `Query timed out after ${effectiveTimeout / 1000} seconds.`
                     : 'Query was cancelled.';
                 return new vscode.LanguageModelToolResult([
@@ -200,7 +200,7 @@ export class RunQueryTool extends Disposable {
                 // Truncate and indicate
                 const truncatedRows: Record<string, unknown>[] = [];
                 let currentLength = 2; // for "[]"
-                
+
                 for (const row of rows) {
                     const rowJson = JSON.stringify(row, null, 2);
                     if (currentLength + rowJson.length + 3 > MAX_JSON_LENGTH - 100) {
@@ -209,7 +209,7 @@ export class RunQueryTool extends Disposable {
                     truncatedRows.push(row);
                     currentLength += rowJson.length + 3; // comma and newlines
                 }
-                
+
                 jsonResult = JSON.stringify(truncatedRows, null, 2);
                 truncated = true;
                 displayedRowCount = truncatedRows.length;
@@ -220,7 +220,7 @@ export class RunQueryTool extends Disposable {
             response += `**Cluster:** ${cluster}\n`;
             response += `**Database:** ${database}\n`;
             response += `**Rows returned:** ${result.result.totalRows}\n\n`;
-            
+
             if (truncated) {
                 response += `⚠️ **Result truncated** (showing ${displayedRowCount} of ${result.result.totalRows} rows)\n\n`;
             }

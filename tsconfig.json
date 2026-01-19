@@ -12,5 +12,5 @@
 		"useDefineForClassFields": false,
 		"skipLibCheck": true
 	},
-	"include": ["./src/**/*"]
+	"include": ["./src/**/*", "entry.js"]
 }

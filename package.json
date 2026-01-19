@@ -22,13 +22,13 @@
 		"Programming Languages"
 	],
 	"activationEvents": [
-		"onLanguage:kusto"
+		"*"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/hediet/vscode-kusto"
 	},
-	"main": "./dist/extension.js",
+	"main": "./entry.js",
 	"contributes": {
 		"languageModelTools": [
 			{
@@ -128,7 +128,7 @@
 		"build": "npm run build:webview && npm run build:extension",
 		"build:extension": "rollup -c rollup.config.mjs",
 		"build:webview": "cd webview && npm install && npm run build",
-		"package": "node scripts/package.js",
+		"package": "npm run build && vsce package --out extension.vsix --no-yarn --no-dependencies",
 		"watch": "rollup -c rollup.config.mjs --watch",
 		"watch:webview": "cd webview && npm run dev",
 		"dev": "npm run watch",
@@ -138,6 +138,7 @@
 	},
 	"devDependencies": {
 		"@rollup/plugin-commonjs": "^29.0.0",
+		"@rollup/plugin-json": "^6.1.0",
 		"@rollup/plugin-node-resolve": "^16.0.3",
 		"@rollup/plugin-replace": "^6.0.3",
 		"@rollup/plugin-typescript": "^12.3.0",
@@ -168,6 +169,7 @@
 		"language-configuration.json",
 		"LICENSE",
 		"docs/**/*",
+		"entry.js",
 		"*.md"
 	]
 }
