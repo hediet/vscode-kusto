@@ -1,6 +1,7 @@
 {
 	"name": "kusto",
 	"private": true,
+	"packageManager": "pnpm@9.15.4",
 	"displayName": "Kusto",
 	"description": "",
 	"keywords": [
@@ -125,13 +126,14 @@
 		]
 	},
 	"scripts": {
-		"build": "npm run build:webview && npm run build:extension",
+		"preinstall": "node -e \"if(!/pnpm/.test(process.env.npm_execpath||''))throw new Error('Use pnpm')\"",
+		"build": "pnpm run build:webview && pnpm run build:extension",
 		"build:extension": "rollup -c rollup.config.mjs",
-		"build:webview": "cd webview && npm install && npm run build",
-		"package": "npm run build && vsce package --out extension.vsix --no-yarn --no-dependencies",
+		"build:webview": "cd webview && pnpm install && pnpm run build",
+		"package": "pnpm run build && vsce package --out extension.vsix --no-yarn --no-dependencies",
 		"watch": "rollup -c rollup.config.mjs --watch",
-		"watch:webview": "cd webview && npm run dev",
-		"dev": "npm run watch",
+		"watch:webview": "cd webview && pnpm run dev",
+		"dev": "pnpm run watch",
 		"test": "vitest --run",
 		"get-types": "dts dev",
 		"generate-telemetry": "tsx scripts/generate-telemetry-kql.ts"
@@ -167,7 +169,6 @@
 		"dist/**/*",
 		"syntaxes/**/*",
 		"language-configuration.json",
-		"LICENSE",
 		"docs/**/*",
 		"entry.js",
 		"*.md"
